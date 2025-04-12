@@ -17,17 +17,17 @@ const heroSheet = {
       spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
     },
     walk: {
-      frame: { x: 64, y: 64, w: 128, h: 128 },
+      frame: { x: 64, y: 0, w: 64, h: 64 },
       sourceSize: { w: 64, h: 64 },
       spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
     },
     jump: {
-      frame: { x: 128, y: 128, w: 192, h: 192 },
+      frame: { x: 128, y: 0, w: 64, h: 64 },
       sourceSize: { w: 64, h: 64 },
       spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
     },
     fall: {
-      frame: { x: 192, y: 192, w: 256, h: 256 },
+      frame: { x: 192, y: 0, w: 64, h: 64 },
       sourceSize: { w: 64, h: 64 },
       spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
     },
@@ -41,7 +41,7 @@ const heroSheet = {
   },
   animations: {
     idle: ['idle'],
-    walk: ['walk', 'idle'],
+    walk: ['idle', 'walk'],
     jump: ['jump', 'fall'],
   },
 };
@@ -64,7 +64,9 @@ class Player extends Container {
     this.idleAnimation = new AnimatedSprite(sheet.animations.idle);
     this.walkingAnimation = new AnimatedSprite(sheet.animations.walk);
     this.jumpingAnimation = new AnimatedSprite(sheet.animations.jump);
-    this.currentAnimation = this.idleAnimation;
+    this.currentAnimation = this.walkingAnimation;
+    this.currentAnimation.loop = true;
+    this.currentAnimation.animationSpeed = 0.1;
     this.currentAnimation.play();
   }
 
