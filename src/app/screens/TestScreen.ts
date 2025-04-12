@@ -43,7 +43,8 @@ const heroSheet = {
   animations: {
     idle: ['idle'],
     walk: ['walk', 'idle'],
-    jump: ['jump', 'fall'],
+    jump: ['jump'],
+    fall: ['fall'],
   },
 };
 
@@ -53,27 +54,38 @@ const heroSheet = {
 class Player extends Container {
   private currentAnimation: AnimatedSprite;
   private idleAnimation: AnimatedSprite;
-  private walkingAnimation: AnimatedSprite;
-  private jumpingAnimation: AnimatedSprite;
+  private walkAnimation: AnimatedSprite;
+  private jumpAnimation: AnimatedSprite;
+  private fallAnimation: AnimatedSprite;
 
   private direction: 'left' | 'right' = 'right';
   private vx = 0;
   private speed = 2;
 
+  private vy = 0;
+  private gravity = 0.5;
+  private jumpForce = -10;
+  private groundY = 300; // temporary until platforms/collision
+  private isInAir = false;
+
   constructor(animations: Spritesheet['animations']) {
     super();
 
     this.idleAnimation = new AnimatedSprite(animations.idle);
-    this.walkingAnimation = new AnimatedSprite(animations.walk);
-    this.jumpingAnimation = new AnimatedSprite(animations.jump);
+    this.walkAnimation = new AnimatedSprite(animations.walk);
+    this.jumpAnimation = new AnimatedSprite(animations.jump);
+    this.fallAnimation = new AnimatedSprite(animations.fall);
 
-    [this.idleAnimation, this.walkingAnimation, this.jumpingAnimation].forEach(
-      (anim) => {
-        anim.anchor.set(0.5, 0);
-        anim.loop = true;
-        anim.animationSpeed = 0.1;
-      }
-    );
+    [
+      this.idleAnimation,
+      this.walkAnimation,
+      this.jumpAnimation,
+      this.fallAnimation,
+    ].forEach((anim) => {
+      anim.anchor.set(0.5, 0);
+      anim.loop = true;
+      anim.animationSpeed = 0.1;
+    });
 
     this.currentAnimation = this.idleAnimation;
     this.currentAnimation.play();
@@ -94,13 +106,30 @@ class Player extends Container {
 
   public update() {
     this.x += this.vx;
+    this.vy += this.gravity;
+    this.y += this.vy;
 
+    // Landing check
+    if (this.y >= this.groundY) {
+      this.y = this.groundY;
+      this.vy = 0;
+      this.isInAir = false;
+    }
+
+    // Direction player is facing
     if (this.vx < 0) {
       this.direction = 'left';
-      this.setAnimation(this.walkingAnimation);
     } else if (this.vx > 0) {
       this.direction = 'right';
-      this.setAnimation(this.walkingAnimation);
+    }
+
+    // Animation for walking/jumping
+    if (this.vy < 0) {
+      this.setAnimation(this.jumpAnimation);
+    } else if (this.vy > 0) {
+      this.setAnimation(this.fallAnimation);
+    } else if (this.vx !== 0) {
+      this.setAnimation(this.walkAnimation);
     } else {
       this.setAnimation(this.idleAnimation);
     }
@@ -118,6 +147,13 @@ class Player extends Container {
 
   public stop() {
     this.vx = 0;
+  }
+
+  public jump() {
+    if (!this.isInAir) {
+      this.vy = this.jumpForce;
+      this.isInAir = true;
+    }
   }
 
   public pause() {
@@ -217,6 +253,10 @@ export class TestScreen extends Container {
 
   private onKeyDown = (e: KeyboardEvent) => {
     this.keys.add(e.key);
+
+    if (e.key === ' ') {
+      this.player.jump();
+    }
   };
 
   private onKeyUp = (e: KeyboardEvent) => {
