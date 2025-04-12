@@ -8,28 +8,29 @@ import {
   type Ticker,
 } from 'pixi.js';
 import { engine } from '../getEngine';
+import { KeyboardInput } from '../input/KeyboardInput';
 import { PausePopup } from '../popups/PausePopup';
 
 /** Spritesheet definition for the player character */
 const heroSheet = {
   frames: {
     idle: {
-      frame: { x: 0, y: 0, w: 64, h: 64 },
+      frame: { x: 4, y: 2, w: 64, h: 64 },
       sourceSize: { w: 64, h: 64 },
       spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
     },
     walk: {
-      frame: { x: 64, y: 0, w: 64, h: 64 },
+      frame: { x: 68, y: 2, w: 64, h: 64 },
       sourceSize: { w: 64, h: 64 },
       spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
     },
     jump: {
-      frame: { x: 128, y: 0, w: 64, h: 64 },
+      frame: { x: 132, y: 2, w: 64, h: 64 },
       sourceSize: { w: 64, h: 64 },
       spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
     },
     fall: {
-      frame: { x: 192, y: 0, w: 64, h: 64 },
+      frame: { x: 196, y: 2, w: 64, h: 64 },
       sourceSize: { w: 64, h: 64 },
       spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
     },
@@ -37,7 +38,7 @@ const heroSheet = {
   meta: {
     image: 'hero-spritesheet.png',
     format: 'RGBA8888',
-    size: { w: 256, h: 64 },
+    size: { w: 260, h: 68 },
     scale: 1,
   },
   animations: {
@@ -60,13 +61,13 @@ class Player extends Container {
 
   private direction: 'left' | 'right' = 'right';
   private vx = 0;
-  private speed = 2;
-
   private vy = 0;
+  private isInAir = false;
+
+  private speed = 2;
   private gravity = 0.5;
   private jumpForce = -10;
   private groundY = 300; // temporary until platforms/collision
-  private isInAir = false;
 
   constructor(animations: Spritesheet['animations']) {
     super();
@@ -104,10 +105,10 @@ class Player extends Container {
     return sheet;
   }
 
-  public update() {
-    this.x += this.vx;
-    this.vy += this.gravity;
-    this.y += this.vy;
+  public update(deltaTime: number) {
+    this.x += this.vx * deltaTime;
+    this.vy += this.gravity * deltaTime;
+    this.y += this.vy * deltaTime;
 
     // Landing check
     if (this.y >= this.groundY) {
@@ -190,12 +191,15 @@ export class TestScreen extends Container {
   public static assetBundles = ['main', 'test']; // using main for now as placeholder (see MainScreen.ts)
 
   public testContainer: Container;
+  private paused = false;
+  private keyboard = new KeyboardInput();
   private player!: Player;
-  private keys = new Set<string>();
 
   constructor() {
     super();
-    TexturePool.textureOptions.scaleMode = 'linear';
+
+    // Config
+    TexturePool.textureOptions.scaleMode = 'nearest';
 
     this.testContainer = new Container();
     this.addChild(this.testContainer);
@@ -212,56 +216,49 @@ export class TestScreen extends Container {
     const sheet = await Player.loadSpritesheet();
     this.player = new Player(sheet.animations);
     this.testContainer.addChild(this.player);
-
-    window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', this.onKeyUp);
     engine().ticker.add(this.update, this);
   }
 
   public async pause() {
-    window.removeEventListener('keydown', this.onKeyDown);
-    window.removeEventListener('keyup', this.onKeyUp);
-    engine().ticker.remove(this.update, this);
-
+    this.paused = true;
+    this.keyboard.pause();
     this.testContainer.interactiveChildren = false;
     this.player.pause();
   }
 
   public async resume() {
-    window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', this.onKeyUp);
-    engine().ticker.add(this.update, this);
-
+    this.paused = false;
+    this.keyboard.resume();
     this.testContainer.interactiveChildren = true;
     this.player.resume();
   }
 
-  public update(_time: Ticker) {
+  public update(ticker: Ticker) {
+    if (this.paused) return;
+    this.keyboard.update();
     this.updateMovement();
-    this.player.update();
+    this.player.update(ticker.deltaTime);
   }
 
   private updateMovement() {
-    if (this.keys.has('ArrowLeft') && !this.keys.has('ArrowRight')) {
+    if (
+      this.keyboard.isHeld('ArrowLeft') &&
+      !this.keyboard.isHeld('ArrowRight')
+    ) {
       this.player.moveLeft();
-    } else if (this.keys.has('ArrowRight') && !this.keys.has('ArrowLeft')) {
+    } else if (
+      this.keyboard.isHeld('ArrowRight') &&
+      !this.keyboard.isHeld('ArrowLeft')
+    ) {
       this.player.moveRight();
     } else {
       this.player.stop();
     }
-  }
 
-  private onKeyDown = (e: KeyboardEvent) => {
-    this.keys.add(e.key);
-
-    if (e.key === ' ') {
+    if (this.keyboard.isPressedOnce('Space')) {
       this.player.jump();
     }
-  };
-
-  private onKeyUp = (e: KeyboardEvent) => {
-    this.keys.delete(e.key);
-  };
+  }
 
   /** Pause the app if the window loses focus */
   public blur() {
