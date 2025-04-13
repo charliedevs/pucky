@@ -1,24 +1,23 @@
-/**
- * Lightweight physics body for platformer-style motion.
- * Handles acceleration, deceleration, gravity, and jump force.
- *
- * @example
- * const body = new PhysicsBody({ ax: 0.2, g: 0.5 });
- *
- * @param maxSpeedX Maximum velocity in X (default: 2.5)
- * @param g   Gravity acceleration (default: 0.5)
- */
 export interface PhysicsParams {
   /** Max velocity (horizontal)
-   * @default 2.5
+   * @default 3
    */
   maxSpeedX?: number;
   /** Gravity applied to body
    * @default 0.5
    */
-  g?: number;
+  gravity?: number;
 }
 
+/**
+ * A physics object that can accelerate and respects gravity.
+ *
+ * @example
+ * const physics = new PhysicsBody({ maxSpeedX: 4, g: 0.5 });
+ *
+ * @param maxSpeedX Maximum velocity in X
+ * @param g   Gravity acceleration
+ */
 export class PhysicsBody {
   /** Parameters that control motion behavior */
   private static readonly TUNING = {
@@ -55,7 +54,7 @@ export class PhysicsBody {
 
   constructor(params: PhysicsParams = {}) {
     this.maxSpeedX = params.maxSpeedX ?? 3;
-    this.g = params.g ?? 0.5;
+    this.g = params.gravity ?? 0.5;
   }
   /**
    * Update velocity based on input and gravity
