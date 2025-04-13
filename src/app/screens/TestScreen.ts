@@ -90,7 +90,7 @@ class Player extends Container {
       squashScaleY: 0.5,
       squashScaleX: 1.15,
       stretchScaleY: 1.25,
-      stretchScaleX: 0.8,
+      stretchScaleX: 0.75,
       preJumpSquashDurationMs: 50,
       stretchDurationMs: 90,
       landingSquashDurationMs: 80,

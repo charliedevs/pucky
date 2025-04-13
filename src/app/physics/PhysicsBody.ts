@@ -31,10 +31,10 @@ export class PhysicsBody {
     easeGround: 0.135,
 
     /** Ease factor when switching directions */
-    easeTurnMultiplier: 0.5,
+    easeTurnMultiplier: 0.25,
 
     /** Air control multiplier (how much horizontal influence midair) */
-    easeAir: 0.03,
+    easeAir: 0.3,
 
     /** Max fraction of speedX allowed while airborne */
     airSpeedFactor: 0.7,
@@ -65,9 +65,9 @@ export class PhysicsBody {
     // Determine target horizontal velocity
     const targetVx = this.inputX * this.maxSpeedX;
 
-    // If switching directions, apply harsher easing
     let easeFactor = this.isOnGround ? t.easeGround : t.easeAir;
     if (this.inputX !== 0 && Math.sign(this.inputX) !== Math.sign(this.vel.x)) {
+      // If switching directions, apply harsher easing
       easeFactor *= t.easeTurnMultiplier;
     }
 
