@@ -15,13 +15,13 @@ export class KeyboardInput {
   }
 
   /** Is the key currently being held down? */
-  public isHeld(key: string): boolean {
-    return this.heldKeys.has(key);
+  public isHeld(keycode: KeyboardEvent['code']): boolean {
+    return this.heldKeys.has(keycode);
   }
 
   /** Was the key just pressed down this frame? */
-  public isPressedOnce(key: string): boolean {
-    return this.pressedKeys.has(key);
+  public isPressedOnce(keycode: KeyboardEvent['code']): boolean {
+    return this.pressedKeys.has(keycode);
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
