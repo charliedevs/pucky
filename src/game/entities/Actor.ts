@@ -1,6 +1,8 @@
 import { Container } from 'pixi.js';
+import { debugConfig } from '../debug/DebugConfig';
+import { HitboxDebugOverlay } from '../debug/HitboxOverlay';
 
-interface CollisionHitbox {
+interface SolidBox {
   offsetX: number;
   offsetY: number;
   width: number;
@@ -9,8 +11,8 @@ interface CollisionHitbox {
 
 /** Tuning params for game feel */
 export interface ActorTuning {
-  /** Hitbox for collisions - `{offsetX, offsetY, width, height}` */
-  collisionHitbox: CollisionHitbox;
+  /** Hitbox for collisions with solids - `{offsetX, offsetY, width, height}` */
+  solidBox: SolidBox;
 
   /** Max horizontal speed */
   maxSpeedX: number;
@@ -43,7 +45,7 @@ export interface ActorTuning {
 }
 
 const TUNING_DEFAULTS = {
-  collisionHitbox: {
+  solidBox: {
     offsetX: -16,
     offsetY: -64,
     width: 32,
@@ -104,6 +106,8 @@ export abstract class Actor extends Container {
   /** Track if jump button is held down */
   private jumpHeld = false;
 
+  private debugOverlay?: HitboxDebugOverlay;
+
   constructor(tuning: Partial<ActorTuning> = {}) {
     super();
     this.tuning = {
@@ -113,23 +117,16 @@ export abstract class Actor extends Container {
         ...TUNING_DEFAULTS.shortHop,
         ...tuning.shortHop,
       },
-      collisionHitbox: {
-        ...TUNING_DEFAULTS.collisionHitbox,
-        ...tuning.collisionHitbox,
+      solidBox: {
+        ...TUNING_DEFAULTS.solidBox,
+        ...tuning.solidBox,
       },
     };
 
-    // Add red debug rectangle to visualize collision hitbox
-    // const debugBox = new Graphics()
-    //   .rect(
-    //     this.tuning.collisionHitbox.offsetX,
-    //     this.tuning.collisionHitbox.offsetY,
-    //     this.tuning.collisionHitbox.width,
-    //     this.tuning.collisionHitbox.height
-    //   )
-    //   .stroke({ color: 0xff0000, width: 1 });
-
-    // this.addChild(debugBox);
+    // DEBUG
+    const { width, height } = this.tuning.solidBox;
+    this.debugOverlay = new HitboxDebugOverlay(width, height, 'actor');
+    this.addChild(this.debugOverlay);
   }
 
   /** Update velocity based on desired input. Called every frame by scene */
@@ -175,6 +172,20 @@ export abstract class Actor extends Container {
       }
     }
     this.vel.y += gravityFactor * dt;
+
+    // DEBUG
+    if (this.debugOverlay && debugConfig.getShowHitboxes()) {
+      const box = this.getSolidBox();
+      this.debugOverlay.updateBox(
+        box.x - this.x,
+        box.y - this.y,
+        box.width,
+        box.height
+      );
+      this.debugOverlay.setVisible(true);
+    } else {
+      this.debugOverlay?.setVisible(false);
+    }
   }
 
   /** Provide a callback to determine collision with other objects
@@ -214,7 +225,7 @@ export abstract class Actor extends Container {
     while (remaining > 0) {
       const step = Math.min(1, remaining);
       const nextX = this.x + step * sign;
-      const bounds = this.getCollisionHitbox(nextX, this.y);
+      const bounds = this.getSolidBox(nextX, this.y);
       if (
         this.checkCollisionFn(bounds.x, bounds.y, bounds.width, bounds.height)
       ) {
@@ -238,7 +249,7 @@ export abstract class Actor extends Container {
     while (remaining > 0) {
       const step = Math.min(1, remaining);
       const nextY = this.y + step * sign;
-      const bounds = this.getCollisionHitbox(this.x, nextY);
+      const bounds = this.getSolidBox(this.x, nextY);
       if (
         this.checkCollisionFn(bounds.x, bounds.y, bounds.width, bounds.height)
       ) {
@@ -252,13 +263,13 @@ export abstract class Actor extends Container {
   }
 
   /** Get collision hitbox  */
-  protected getCollisionHitbox(
+  protected getSolidBox(
     x: number | undefined = undefined,
     y: number | undefined = undefined
   ) {
     const startX = x !== undefined ? x : this.x;
     const startY = y !== undefined ? y : this.y;
-    const hitbox = this.tuning.collisionHitbox;
+    const hitbox = this.tuning.solidBox;
     return {
       x: startX + hitbox.offsetX,
       y: startY + hitbox.offsetY,

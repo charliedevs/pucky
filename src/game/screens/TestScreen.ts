@@ -1,4 +1,5 @@
 import { Container, TexturePool, type Ticker } from 'pixi.js';
+import { debugConfig } from '../debug/DebugConfig';
 import { Player } from '../entities/Player';
 import { Solid } from '../entities/Solid';
 import { engine } from '../getEngine';
@@ -66,6 +67,11 @@ export class TestScreen extends Container {
     this.keyboard.update();
     this.handleInput();
     this.player.update(ticker.deltaTime, this.keyboard);
+
+    // DEBUG
+    if (this.keyboard.isPressedOnce('F1')) {
+      debugConfig.toggleHitboxes();
+    }
   }
 
   private handleInput() {
