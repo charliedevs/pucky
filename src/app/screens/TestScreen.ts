@@ -57,12 +57,33 @@ enum PlayerAnimationState {
   Fall,
 }
 
+enum Direction {
+  Left = -1,
+  None = 0,
+  Right = 1,
+}
+
 /**
  * Player Class
  */
 class Player extends Container {
-  private static readonly JUMP_FORCE = 10;
   private static readonly GROUND_Y = 300; // temporary until platforms/collision
+
+  /** Parameters to adjust game feel. */
+  private static readonly TUNING = {
+    /** How strong the jump is */
+    jumpForce: 10,
+    /** Minimum vx to consider 'moving' */
+    moveThreshold: 0.05,
+    /** How long to pause animation when walk starts */
+    walkPause: 50,
+    /** Speed of walking loop */
+    walkAnimSpeed: 0.08,
+    /** Visual squash for jumping */
+    squash: { scaleY: 0.5, durationMs: 40 },
+    /** Time to pause on closed-feet before going idle */
+    idleSnapDelay: 80,
+  } as const;
 
   private idleAnimation: AnimatedSprite;
   private walkAnimation: AnimatedSprite;
@@ -71,8 +92,10 @@ class Player extends Container {
   private currentAnimation: AnimatedSprite;
 
   private physics = new PhysicsBody();
-  private facing: 'left' | 'right' = 'right';
+  private facingDir: Direction = Direction.Right;
+  private moveDir: Direction = Direction.None;
   private animState: PlayerAnimationState = PlayerAnimationState.Idle;
+  private isSquashingJump = false;
 
   constructor(animations: Spritesheet['animations']) {
     super();
@@ -82,16 +105,10 @@ class Player extends Container {
     this.jumpAnimation = new AnimatedSprite(animations.jump);
     this.fallAnimation = new AnimatedSprite(animations.fall);
 
-    [
-      this.idleAnimation,
-      this.walkAnimation,
-      this.jumpAnimation,
-      this.fallAnimation,
-    ].forEach((anim) => {
-      anim.anchor.set(0.5, 0);
-      anim.loop = true;
-      anim.animationSpeed = 0.1;
-    });
+    this.setupAnim(this.idleAnimation);
+    this.setupAnim(this.walkAnimation, 0.08);
+    this.setupAnim(this.jumpAnimation);
+    this.setupAnim(this.fallAnimation);
 
     this.currentAnimation = this.idleAnimation;
     this.currentAnimation.play();
@@ -115,25 +132,44 @@ class Player extends Container {
     this.position = this.physics.getNextPosition(this.position, dt);
     this.y = this.physics.checkGround(Player.GROUND_Y, this.y);
 
+    this.setSpriteDirection();
     this.updateAnimationState();
-    this.updateFacingDirection();
   }
 
   public moveLeft() {
-    this.physics.setInputX(-1);
+    this.move(Direction.Left);
   }
 
   public moveRight() {
-    this.physics.setInputX(1);
+    this.move(Direction.Right);
   }
 
   public stop() {
-    this.physics.setInputX(0);
+    this.move(Direction.None);
+  }
+
+  private move(dir: Direction) {
+    if (dir !== this.moveDir && this.moveDir !== Direction.None) {
+      this.playWalkWithIntro();
+    }
+    this.moveDir = dir;
+    this.physics.setInputX(dir);
+
+    if (dir !== Direction.None) {
+      this.facingDir = dir;
+    }
   }
 
   public jump() {
-    const fy = Player.JUMP_FORCE * -1;
-    this.physics.jump(fy);
+    if (this.isSquashingJump) return;
+    this.isSquashingJump = true;
+
+    this.scale.y = Player.TUNING.squash.scaleY;
+    setTimeout(() => {
+      this.scale.y = 1;
+      this.physics.jump(-Player.TUNING.jumpForce);
+      this.isSquashingJump = false;
+    }, Player.TUNING.squash.durationMs);
   }
 
   public pause() {
@@ -144,6 +180,12 @@ class Player extends Container {
     this.currentAnimation.play();
   }
 
+  private setupAnim(anim: AnimatedSprite, speed = 0.1) {
+    anim.anchor.set(0.5, 1);
+    anim.loop = true;
+    anim.animationSpeed = speed;
+  }
+
   private playAnimation(anim: AnimatedSprite) {
     if (this.currentAnimation === anim) return;
 
@@ -152,26 +194,77 @@ class Player extends Container {
 
     this.currentAnimation = anim;
     this.currentAnimation.play();
+    this.setSpriteDirection();
     this.addChild(this.currentAnimation);
+  }
+
+  private playWalkWithIntro() {
+    this.walkAnimation.animationSpeed = Player.TUNING.walkAnimSpeed;
+    const pauseFrame = this.physics.isOnGround ? 0 : 1;
+    this.startPausedAnimation(
+      this.walkAnimation,
+      pauseFrame,
+      Player.TUNING.walkPause
+    );
+  }
+
+  private startPausedAnimation(
+    anim: AnimatedSprite,
+    frame: number,
+    delay: number
+  ) {
+    this.playAnimation(anim);
+    anim.gotoAndStop(frame);
+    setTimeout(() => anim.play(), delay);
   }
 
   private updateAnimationState() {
     const { x: vx, y: vy } = this.physics.vel;
-    let newState: PlayerAnimationState;
+    const isWalking = Math.abs(vx) > Player.TUNING.moveThreshold;
 
+    let newState: PlayerAnimationState;
     if (vy < 0) {
       newState = PlayerAnimationState.Jump;
     } else if (vy > 0) {
       newState = PlayerAnimationState.Fall;
-    } else if (vx !== 0) {
+    } else if (isWalking) {
+      if (this.animState !== PlayerAnimationState.Walk) {
+        setTimeout(() => {
+          if (
+            this.animState !== PlayerAnimationState.Walk &&
+            Math.abs(this.physics.vel.x) > Player.TUNING.moveThreshold
+          ) {
+            this.animState = PlayerAnimationState.Walk;
+            this.playWalkWithIntro();
+          }
+        }, Player.TUNING.walkPause);
+        return;
+      }
       newState = PlayerAnimationState.Walk;
     } else {
       newState = PlayerAnimationState.Idle;
     }
 
+    if (
+      this.animState === PlayerAnimationState.Walk &&
+      newState === PlayerAnimationState.Idle
+    ) {
+      // Pause on walk frame 1 (closed feet) before transitioning to idle
+      this.walkAnimation.gotoAndStop(1);
+      setTimeout(() => {
+        if (
+          this.animState === PlayerAnimationState.Walk &&
+          Math.abs(this.physics.vel.x) < Player.TUNING.moveThreshold
+        ) {
+          this.animState = PlayerAnimationState.Idle;
+          this.playAnimation(this.idleAnimation);
+        }
+      }, Player.TUNING.idleSnapDelay);
+      return;
+    }
+
     if (newState !== this.animState) {
       this.animState = newState;
-
       switch (newState) {
         case PlayerAnimationState.Jump:
           this.playAnimation(this.jumpAnimation);
@@ -180,7 +273,7 @@ class Player extends Container {
           this.playAnimation(this.fallAnimation);
           break;
         case PlayerAnimationState.Walk:
-          this.playAnimation(this.walkAnimation);
+          this.playWalkWithIntro();
           break;
         case PlayerAnimationState.Idle:
         default:
@@ -190,15 +283,8 @@ class Player extends Container {
     }
   }
 
-  private updateFacingDirection() {
-    const vx = this.physics.vel.x;
-    if (vx < 0) {
-      this.facing = 'left';
-    } else if (vx > 0) {
-      this.facing = 'right';
-    }
-
-    this.currentAnimation.scale.x = this.facing === 'left' ? -1 : 1;
+  private setSpriteDirection() {
+    this.currentAnimation.scale.x = this.facingDir === Direction.Left ? -1 : 1;
   }
 }
 
