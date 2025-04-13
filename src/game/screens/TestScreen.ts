@@ -25,6 +25,7 @@ export class TestScreen extends Container {
 
   private solids: Solid[] = [];
   private player!: Player;
+  private playerDestroyed = false;
 
   constructor() {
     super();
@@ -42,10 +43,11 @@ export class TestScreen extends Container {
     this.solids.push(platform);
     this.testContainer.addChild(platform);
 
-    const playerSpritesheet = await Player.loadSpritesheet();
-    this.player = new Player(playerSpritesheet.animations);
-    this.player.setCollisionChecker(this.collidesAt.bind(this));
-    this.testContainer.addChild(this.player);
+    const deathZone = new Solid(-1000, 800, 8000, 50, true);
+    this.solids.push(deathZone);
+    this.testContainer.addChild(deathZone);
+
+    await this.createPlayer();
 
     engine().ticker.add(this.update, this);
   }
@@ -94,16 +96,44 @@ export class TestScreen extends Container {
     }
   }
 
+  private async createPlayer() {
+    const playerSpritesheet = await Player.loadSpritesheet();
+    this.player = new Player(playerSpritesheet.animations);
+    this.player.setCollisionChecker(this.collidesAt.bind(this));
+    this.testContainer.addChild(this.player);
+    this.player.setHazardCallback(() => {
+      this.destroyAndRespawnPlayer();
+    });
+  }
+
   private collidesAt(x: number, y: number, width: number, height: number) {
-    return this.solids.some((solid) => {
+    for (const solid of this.solids) {
       const bounds = solid.getBoundsRect();
-      return (
+      const isColliding =
         x + width > bounds.x &&
         x < bounds.x + bounds.width &&
         y + height > bounds.y &&
-        y < bounds.y + bounds.height
-      );
-    });
+        y < bounds.y + bounds.height;
+
+      if (isColliding && solid.isHazard) {
+        this.player.onHazardTouched?.();
+      }
+
+      if (isColliding) return true;
+    }
+    return false;
+  }
+
+  private async destroyAndRespawnPlayer() {
+    if (this.playerDestroyed) return;
+    this.playerDestroyed = true;
+    this.testContainer.removeChild(this.player);
+
+    // Recreate player after short delay
+    setTimeout(async () => {
+      await this.createPlayer();
+      this.playerDestroyed = false;
+    }, 150);
   }
 
   /** Pause the app if the window loses focus */

@@ -94,6 +94,8 @@ export abstract class Actor extends Container {
   public vel = { x: 0, y: 0 };
   /** Actor is touching ground */
   public isOnGround = false;
+  /** Optional callback when colliding with hazard */
+  public onHazardTouched: (() => void) | null = null;
   /** Collision checker set by owner of the Actor */
   protected checkCollisionFn: CollisionCheckFn = () => false;
   /** Desired input direction (-1 = left, 1 = right) */
@@ -193,6 +195,11 @@ export abstract class Actor extends Container {
    */
   public setCollisionChecker(fn: CollisionCheckFn) {
     this.checkCollisionFn = fn;
+  }
+
+  /** Provide a callback to handle collision with hazard */
+  public setHazardCallback(cb: () => void) {
+    this.onHazardTouched = cb;
   }
 
   /** Set desired horizontal movement (-1 = left, 1 = right) */

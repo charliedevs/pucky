@@ -12,6 +12,8 @@ import { Container, Graphics } from 'pixi.js';
  * container.addChild(platform);
  */
 export class Solid extends Container {
+  public readonly isHazard: boolean;
+
   private _width: number;
   private _height: number;
 
@@ -23,16 +25,23 @@ export class Solid extends Container {
    * @param width - Width of the solid area in pixels
    * @param height - Height of the solid area in pixels
    */
-  constructor(x: number, y: number, width: number, height: number) {
+  constructor(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    isHazard = false
+  ) {
     super();
     this.position.set(x, y);
     this._width = width;
     this._height = height;
 
-    // Optional: add a visible debug box
-    const gfx = new Graphics()
-      .rect(0, 0, width, height)
-      .fill({ color: 0x448844 });
+    this.isHazard = isHazard;
+
+    // Debug: make visible using simple graphics for now
+    const color = isHazard ? 0xff4444 : 0x448844;
+    const gfx = new Graphics().rect(0, 0, width, height).fill({ color });
     this.addChild(gfx);
   }
 
