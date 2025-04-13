@@ -1,5 +1,6 @@
-import { Container, Graphics, TexturePool, type Ticker } from 'pixi.js';
+import { Container, TexturePool, type Ticker } from 'pixi.js';
 import { Player } from '../entities/Player';
+import { Solid } from '../entities/Solid';
 import { engine } from '../getEngine';
 import { KeyboardInput } from '../input/KeyboardInput';
 import { PausePopup } from '../popups/PausePopup';
@@ -20,6 +21,8 @@ export class TestScreen extends Container {
   public testContainer: Container;
   private paused = false;
   private keyboard = new KeyboardInput();
+
+  private solids: Solid[] = [];
   private player!: Player;
 
   constructor() {
@@ -34,14 +37,13 @@ export class TestScreen extends Container {
 
   /** Show the screen */
   public async show() {
-    const shape = new Graphics()
-      .rect(200, 200, 200, 180)
-      .fill({ color: '#FFEA00', alpha: 0.8 });
+    const platform = new Solid(100, 350, 300, 40);
+    this.solids.push(platform);
+    this.testContainer.addChild(platform);
 
-    this.testContainer.addChild(shape);
-
-    const sheet = await Player.loadSpritesheet();
-    this.player = new Player(sheet.animations);
+    const playerSpritesheet = await Player.loadSpritesheet();
+    this.player = new Player(playerSpritesheet.animations);
+    this.player.setCollisionChecker(this.collidesAt.bind(this));
     this.testContainer.addChild(this.player);
 
     engine().ticker.add(this.update, this);
@@ -62,11 +64,11 @@ export class TestScreen extends Container {
   public update(ticker: Ticker) {
     if (this.paused) return;
     this.keyboard.update();
-    this.updateMovement();
+    this.handleInput();
     this.player.update(ticker.deltaTime, this.keyboard);
   }
 
-  private updateMovement() {
+  private handleInput() {
     if (
       this.keyboard.isHeld('ArrowLeft') &&
       !this.keyboard.isHeld('ArrowRight')
@@ -84,6 +86,18 @@ export class TestScreen extends Container {
     if (this.keyboard.isPressedOnce('Space')) {
       this.player.jump();
     }
+  }
+
+  private collidesAt(x: number, y: number, width: number, height: number) {
+    return this.solids.some((solid) => {
+      const bounds = solid.getBoundsRect();
+      return (
+        x + width > bounds.x &&
+        x < bounds.x + bounds.width &&
+        y + height > bounds.y &&
+        y < bounds.y + bounds.height
+      );
+    });
   }
 
   /** Pause the app if the window loses focus */

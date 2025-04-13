@@ -56,8 +56,6 @@ enum Direction {
 }
 
 export class Player extends Actor {
-  private static readonly GROUND_Y = 360; // temporary until platforms/collision
-
   /** Parameters to adjust game feel. */
   private static readonly TUNING = {
     /** How strong the jump is */
@@ -127,7 +125,7 @@ export class Player extends Actor {
     this.currentAnimation.play();
     this.addChild(this.currentAnimation);
 
-    this.position.set(200, 400);
+    this.position.set(200, 200);
   }
 
   public update(dt: number, keyboard: KeyboardInput) {
@@ -135,18 +133,8 @@ export class Player extends Actor {
     this.setJumpHeld(isJumpHeld);
 
     this.updateActor(dt);
-    this.x += this.vel.x * dt;
-    this.y += this.vel.y * dt;
-
-    // TODO: Remove - this is temporary until we add ground/collision
-    if (this.y >= Player.GROUND_Y) {
-      this.y = Player.GROUND_Y;
-      this.vel.y = 0;
-
-      if (this.vel.y >= 0) {
-        this.isOnGround = true;
-      }
-    }
+    this.moveX(dt);
+    this.moveY(dt);
 
     // Check jump buffer to determine whether to begin a jump
     const bufferedJumpStarted =
@@ -167,6 +155,7 @@ export class Player extends Actor {
       this.applyLandingSquash();
     }
 
+    // Update sprite animations
     this.updateSpriteDirection();
     this.updateAnimationStateFromPhysics();
     this.applyAnimationForState();
@@ -268,12 +257,12 @@ export class Player extends Actor {
       dir !== Direction.None &&
       Math.sign(this.vel.x) !== dir &&
       Math.abs(this.vel.x) > Player.TUNING.turnAnticipation.threshold;
+
     if (isReversing && !this.isSkidding) {
       this.triggerTurnSkid(dir);
-      return;
+    } else {
+      this.setInputX(dir);
     }
-
-    this.setInputX(dir);
 
     if (dir !== Direction.None) {
       this.facingDir = dir;
