@@ -1,8 +1,8 @@
-import { setEngine } from './app/getEngine';
-import { LoadScreen } from './app/screens/LoadScreen';
-import { TestScreen } from './app/screens/TestScreen';
-import { userSettings } from './app/utils/userSettings';
 import { CreationEngine } from './engine/engine';
+import { setEngine } from './game/getEngine';
+import { LoadScreen } from './game/screens/LoadScreen';
+import { TestScreen } from './game/screens/TestScreen';
+import { userSettings } from './game/utils/userSettings';
 
 /**
  * Importing these modules will automatically register there plugins with the engine.
