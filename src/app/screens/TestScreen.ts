@@ -87,17 +87,15 @@ class Player extends Container {
 
     /** Visual squash/stretch for jumping */
     jumpVisuals: {
-      squashScaleY: 0.5,
-      squashScaleX: 1.15,
-      stretchScaleY: 1.25,
-      stretchScaleX: 0.75,
+      squashScale: { x: 1.15, y: 0.5 },
+      stretchScale: { x: 0.75, y: 1.25 },
       preJumpSquashDurationMs: 50,
       stretchDurationMs: 90,
       landingSquashDurationMs: 80,
     },
 
     /** Time where you're allowed to jump again before hitting ground */
-    jumpBuffer: 10000,
+    jumpBuffer: 15000,
 
     /** Time to pause on closed-feet before going idle */
     idleSnapDelay: 80,
@@ -151,20 +149,22 @@ class Player extends Container {
     this.position = this.physics.getNextPosition(this.position, dt);
     this.y = this.physics.checkGround(Player.GROUND_Y, this.y);
 
-    // Check jump buffer to see if jump was started
+    // Check jump buffer to determine whether to begin a jump
+    const bufferedJumpStarted =
+      this.jumpBufferMs > 0 && this.physics.isOnGround && !this.isSquashingJump;
+    if (bufferedJumpStarted) {
+      this.jumpBufferMs = 0;
+      this.startJump();
+    }
     if (this.jumpBufferMs > 0) {
-      if (this.physics.isOnGround) {
-        this.jumpBufferMs = 0;
-        this.startJump();
-      }
       this.jumpBufferMs -= dt * 1000; // Remove from buffer every tick
     }
 
+    // Apply landing squash if landing and not jumping again
     const wasGrounded = this.wasGrounded;
     this.wasGrounded = this.physics.isOnGround;
     const justLanded = !wasGrounded && this.physics.isOnGround;
-
-    if (justLanded) {
+    if (justLanded && !this.isSquashingJump) {
       this.applyLandingSquash();
     }
 
@@ -299,19 +299,17 @@ class Player extends Container {
     this.isSquashingJump = true;
 
     const {
-      squashScaleY,
-      squashScaleX,
-      stretchScaleY,
-      stretchScaleX,
+      squashScale,
+      stretchScale,
       preJumpSquashDurationMs: squashDurationMs,
       stretchDurationMs,
     } = Player.TUNING.jumpVisuals;
 
     // Squash before takeoff
-    this.scale.set(squashScaleX, squashScaleY);
+    this.scale.set(squashScale.x, squashScale.y);
     setTimeout(() => {
       // Stretch on takeoff
-      this.scale.set(stretchScaleX, stretchScaleY);
+      this.scale.set(stretchScale.x, stretchScale.y);
       this.physics.jump(-Player.TUNING.jumpForce);
 
       // Return to normal
@@ -323,10 +321,10 @@ class Player extends Container {
   }
 
   private applyLandingSquash() {
-    const { squashScaleY, landingSquashDurationMs } = Player.TUNING.jumpVisuals;
-    this.scale.y = squashScaleY;
+    const { squashScale, landingSquashDurationMs } = Player.TUNING.jumpVisuals;
+    this.scale.set(squashScale.x, squashScale.y);
     setTimeout(() => {
-      this.scale.y = 1;
+      this.scale.set(1, 1);
     }, landingSquashDurationMs);
   }
 
