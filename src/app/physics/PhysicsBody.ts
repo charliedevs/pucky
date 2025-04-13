@@ -38,6 +38,12 @@ export class PhysicsBody {
 
     /** Max fraction of speedX allowed while airborne */
     airSpeedFactor: 0.9,
+
+    /** Variable jump height */
+    shortHop: {
+      enabled: true,
+      earlyReleaseGravityMult: 2,
+    },
   } as const;
 
   /** Current velocity (vx, vy) */
@@ -49,6 +55,8 @@ export class PhysicsBody {
   private wasOnGround = false;
   /** Input direction (-1, 0, 1) */
   private inputX: -1 | 0 | 1 = 0;
+  /** Track if jump button is held down */
+  private jumpHeld = false;
   /** Max velocity (horizontal) */
   private maxSpeedX: number;
   /** Gravity applied to body when falling */
@@ -93,8 +101,15 @@ export class PhysicsBody {
       : this.dampen(this.vel.x, targetVx, easeFactor);
 
     // 6. Apply gravity (different if rising or falling)
-    const gravityFactor =
-      this.vel.y < 0 ? this.g * t.gravityUpMultiplier : this.g;
+    let gravityFactor = this.g;
+    if (this.vel.y < 0) {
+      if (!this.jumpHeld && t.shortHop.enabled) {
+        gravityFactor *=
+          t.gravityUpMultiplier * t.shortHop.earlyReleaseGravityMult;
+      } else {
+        gravityFactor *= t.gravityUpMultiplier;
+      }
+    }
     this.vel.y += gravityFactor * dt;
   }
 
@@ -114,6 +129,11 @@ export class PhysicsBody {
       this.vel.y = fy;
       this.isOnGround = false;
     }
+  }
+
+  /** Keep track of whether jump button is held down */
+  public setJumpHeld(held: boolean) {
+    this.jumpHeld = held;
   }
 
   /**

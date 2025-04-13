@@ -88,10 +88,10 @@ class Player extends Container {
     /** Visual squash/stretch for jumping */
     jumpVisuals: {
       squashScale: { x: 1.15, y: 0.5 },
-      stretchScale: { x: 0.75, y: 1.25 },
-      preJumpSquashDurationMs: 50,
-      stretchDurationMs: 90,
-      landingSquashDurationMs: 80,
+      stretchScale: { x: 0.8, y: 1.25 },
+      preJumpSquashDurationMs: 40,
+      stretchDurationMs: 70,
+      landingSquashDurationMs: 70,
     },
 
     /** Time where you're allowed to jump again before hitting ground */
@@ -144,7 +144,10 @@ class Player extends Container {
     this.position.set(200, 400);
   }
 
-  public update(dt: number) {
+  public update(dt: number, keyboard: KeyboardInput) {
+    const isJumpHeld = keyboard.isHeld('Space');
+    this.physics.setJumpHeld(isJumpHeld);
+
     this.physics.update(dt);
     this.position = this.physics.getNextPosition(this.position, dt);
     this.y = this.physics.checkGround(Player.GROUND_Y, this.y);
@@ -391,7 +394,7 @@ export class TestScreen extends Container {
     if (this.paused) return;
     this.keyboard.update();
     this.updateMovement();
-    this.player.update(ticker.deltaTime);
+    this.player.update(ticker.deltaTime, this.keyboard);
   }
 
   private updateMovement() {
