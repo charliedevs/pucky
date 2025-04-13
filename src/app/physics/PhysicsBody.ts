@@ -5,8 +5,6 @@
  * @example
  * const body = new PhysicsBody({ ax: 0.2, g: 0.5 });
  *
- * @param accelX  Acceleration in the X direction (default: 0.2)
- * @param decelX  Deceleration in the X direction (default: 0.3)
  * @param maxSpeedX Maximum velocity in X (default: 2.5)
  * @param g   Gravity acceleration (default: 0.5)
  */
@@ -22,22 +20,68 @@ export interface PhysicsParams {
 }
 
 export class PhysicsBody {
+  /** Parameters that control motion behavior */
+  private static readonly TUNING = {
+    /** Max horizontal speed */
+    maxSpeedX: 3,
+
+    /** Gravity multiplier when going up */
+    gravityUpMultiplier: 0.6,
+
+    /** Ground acceleration easing factor */
+    easeGround: 0.135,
+
+    /** Ease factor when switching directions */
+    easeTurnMultiplier: 0.5,
+
+    /** Air control multiplier (how much horizontal influence midair) */
+    easeAir: 0.03,
+
+    /** Max fraction of speedX allowed while airborne */
+    airSpeedFactor: 0.7,
+  } as const;
+
   /** Current velocity (vx, vy) */
   public vel = { x: 0, y: 0 };
-
   /** Whether the object is touching the ground */
   public isOnGround = false;
 
   /** Input direction (-1, 0, 1) */
   private inputX: -1 | 0 | 1 = 0;
-
-  /** Parameters of motion */
+  /** Max velocity (horizontal) */
   private maxSpeedX: number;
+  /** Gravity applied to body when falling */
   private g: number;
 
   constructor(params: PhysicsParams = {}) {
-    this.maxSpeedX = params.maxSpeedX ?? 2.5;
+    this.maxSpeedX = params.maxSpeedX ?? 3;
     this.g = params.g ?? 0.5;
+  }
+  /**
+   * Update velocity based on input and gravity
+   */
+  public update(dt: number) {
+    const t = PhysicsBody.TUNING;
+
+    // Determine target horizontal velocity
+    const targetVx = this.inputX * this.maxSpeedX;
+
+    // If switching directions, apply harsher easing
+    let easeFactor = this.isOnGround ? t.easeGround : t.easeAir;
+    if (this.inputX !== 0 && Math.sign(this.inputX) !== Math.sign(this.vel.x)) {
+      easeFactor *= t.easeTurnMultiplier;
+    }
+
+    const appliedTargetVx = this.isOnGround
+      ? targetVx
+      : this.inputX * t.maxSpeedX * t.airSpeedFactor;
+
+    this.vel.x = this.dampen(this.vel.x, appliedTargetVx, easeFactor);
+
+    // Apply gravity (different if rising or falling)
+    const gravityFactor =
+      this.vel.y < 0 ? this.g * t.gravityUpMultiplier : this.g;
+    this.vel.y += gravityFactor * dt;
   }
 
   /**
@@ -55,35 +99,6 @@ export class PhysicsBody {
     if (this.isOnGround) {
       this.vel.y = fy;
       this.isOnGround = false;
-    }
-  }
-
-  /**
-   * Update velocity based on input and gravity
-   */
-  public update(dt: number) {
-    // Horizontal acceleration
-    const targetVx = this.inputX * this.maxSpeedX;
-    let easeFactor = this.isOnGround ? 0.3 : 0.05;
-
-    // If switching directions, apply harsher easing
-    if (Math.sign(this.inputX) !== Math.sign(this.vel.x) && this.inputX !== 0) {
-      easeFactor *= 0.5;
-    }
-
-    this.vel.x = this.easeOutQuad(this.vel.x, targetVx, easeFactor);
-
-    // Gravity
-    if (this.vel.y < 0) {
-      // Going up: apply less gravity
-      this.vel.y += this.g * 0.6 * dt;
-    } else {
-      this.vel.y += this.g * dt;
-    }
-    if (!this.isOnGround && this.inputX !== 0) {
-      const airControlFactor = 0.03;
-      const airTarget = this.inputX * this.maxSpeedX * 0.7;
-      this.vel.x = this.easeOutQuad(this.vel.x, airTarget, airControlFactor);
     }
   }
 
@@ -111,7 +126,7 @@ export class PhysicsBody {
     return currentY;
   }
 
-  private easeOutQuad(current: number, target: number, factor: number): number {
+  private dampen(current: number, target: number, factor: number): number {
     const delta = target - current;
     return current + delta * factor;
   }

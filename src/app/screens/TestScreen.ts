@@ -75,16 +75,22 @@ class Player extends Container {
   private static readonly TUNING = {
     /** How strong the jump is */
     jumpForce: 10,
+
     /** Minimum vx to consider 'moving' */
     moveThreshold: 0.8,
+
     /** How long to pause animation when walk starts */
     walkPause: 50,
+
     /** Speed of walking loop */
     walkAnimSpeed: 0.08,
+
     /** Visual squash for jumping */
     squash: { scaleY: 0.5, durationMs: 40 },
+
     /** Time to pause on closed-feet before going idle */
     idleSnapDelay: 80,
+
     /** Skidding */
     turnAnticipation: {
       threshold: 2, // If speed is over this, apply skid delay on turn
