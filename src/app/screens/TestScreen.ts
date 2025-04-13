@@ -88,6 +88,9 @@ class Player extends Container {
     /** Visual squash for jumping */
     squash: { scaleY: 0.5, durationMs: 40 },
 
+    /** Time where you're allowed to jump again before hitting ground */
+    jumpBuffer: 10000,
+
     /** Time to pause on closed-feet before going idle */
     idleSnapDelay: 80,
 
@@ -102,6 +105,7 @@ class Player extends Container {
   private facingDir: Direction = Direction.Right;
   private isSquashingJump = false;
   private isSkidding = false;
+  private jumpBufferMs = 0;
 
   private idleAnimation: AnimatedSprite;
   private walkAnimation: AnimatedSprite;
@@ -130,13 +134,22 @@ class Player extends Container {
     this.currentAnimation.play();
     this.addChild(this.currentAnimation);
 
-    this.position.set(100, 300);
+    this.position.set(200, 400);
   }
 
   public update(dt: number) {
     this.physics.update(dt);
     this.position = this.physics.getNextPosition(this.position, dt);
     this.y = this.physics.checkGround(Player.GROUND_Y, this.y);
+
+    // Check jump buffer to see if jump was started
+    if (this.jumpBufferMs > 0) {
+      if (this.physics.isOnGround) {
+        this.jumpBufferMs = 0;
+        this.startJump();
+      }
+      this.jumpBufferMs -= dt * 1000; // Remove from buffer every tick
+    }
 
     this.updateSpriteDirection();
     this.updateAnimationStateFromPhysics();
@@ -156,6 +169,10 @@ class Player extends Container {
   }
 
   public jump() {
+    this.jumpBufferMs = Player.TUNING.jumpBuffer;
+  }
+
+  private startJump() {
     if (this.isSquashingJump) return;
     this.isSquashingJump = true;
 
