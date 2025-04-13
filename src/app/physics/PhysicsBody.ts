@@ -11,14 +11,6 @@
  * @param g   Gravity acceleration (default: 0.5)
  */
 export interface PhysicsParams {
-  /** Acceleration (horizontal)
-   * @default 0.2
-   */
-  accelX?: number;
-  /** Deceleration (horizontal)
-   * @default 0.3
-   */
-  decelX?: number;
   /** Max velocity (horizontal)
    * @default 2.5
    */
@@ -40,14 +32,10 @@ export class PhysicsBody {
   private inputX: -1 | 0 | 1 = 0;
 
   /** Parameters of motion */
-  private accelX: number;
-  private decelX: number;
   private maxSpeedX: number;
   private g: number;
 
   constructor(params: PhysicsParams = {}) {
-    this.accelX = params.accelX ?? 0.4;
-    this.decelX = params.decelX ?? 0.2;
     this.maxSpeedX = params.maxSpeedX ?? 2.5;
     this.g = params.g ?? 0.5;
   }
@@ -76,11 +64,27 @@ export class PhysicsBody {
   public update(dt: number) {
     // Horizontal acceleration
     const targetVx = this.inputX * this.maxSpeedX;
-    const accel = targetVx === 0 ? this.decelX : this.accelX;
-    this.vel.x = this.approach(this.vel.x, targetVx, accel * dt);
+    let easeFactor = this.isOnGround ? 0.3 : 0.05;
 
-    // Vertical gravity
-    this.vel.y += this.g * dt;
+    // If switching directions, apply harsher easing
+    if (Math.sign(this.inputX) !== Math.sign(this.vel.x) && this.inputX !== 0) {
+      easeFactor *= 0.5;
+    }
+
+    this.vel.x = this.easeOutQuad(this.vel.x, targetVx, easeFactor);
+
+    // Gravity
+    if (this.vel.y < 0) {
+      // Going up: apply less gravity
+      this.vel.y += this.g * 0.6 * dt;
+    } else {
+      this.vel.y += this.g * dt;
+    }
+    if (!this.isOnGround && this.inputX !== 0) {
+      const airControlFactor = 0.03;
+      const airTarget = this.inputX * this.maxSpeedX * 0.7;
+      this.vel.x = this.easeOutQuad(this.vel.x, airTarget, airControlFactor);
+    }
   }
 
   /**
@@ -107,9 +111,8 @@ export class PhysicsBody {
     return currentY;
   }
 
-  private approach(current: number, target: number, delta: number): number {
-    if (current < target) return Math.min(current + delta, target);
-    if (current > target) return Math.max(current - delta, target);
-    return target;
+  private easeOutQuad(current: number, target: number, factor: number): number {
+    const delta = target - current;
+    return current + delta * factor;
   }
 }
