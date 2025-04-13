@@ -85,8 +85,16 @@ class Player extends Container {
     /** Speed of walking loop */
     walkAnimSpeed: 0.08,
 
-    /** Visual squash for jumping */
-    squash: { scaleY: 0.5, durationMs: 40 },
+    /** Visual squash/stretch for jumping */
+    jumpVisuals: {
+      squashScaleY: 0.5,
+      squashScaleX: 1.15,
+      stretchScaleY: 1.25,
+      stretchScaleX: 0.8,
+      preJumpSquashDurationMs: 50,
+      stretchDurationMs: 90,
+      landingSquashDurationMs: 80,
+    },
 
     /** Time where you're allowed to jump again before hitting ground */
     jumpBuffer: 10000,
@@ -105,6 +113,7 @@ class Player extends Container {
   private facingDir: Direction = Direction.Right;
   private isSquashingJump = false;
   private isSkidding = false;
+  private wasGrounded = false;
   private jumpBufferMs = 0;
 
   private idleAnimation: AnimatedSprite;
@@ -151,6 +160,14 @@ class Player extends Container {
       this.jumpBufferMs -= dt * 1000; // Remove from buffer every tick
     }
 
+    const wasGrounded = this.wasGrounded;
+    this.wasGrounded = this.physics.isOnGround;
+    const justLanded = !wasGrounded && this.physics.isOnGround;
+
+    if (justLanded) {
+      this.applyLandingSquash();
+    }
+
     this.updateSpriteDirection();
     this.updateAnimationStateFromPhysics();
     this.applyAnimationForState();
@@ -170,18 +187,6 @@ class Player extends Container {
 
   public jump() {
     this.jumpBufferMs = Player.TUNING.jumpBuffer;
-  }
-
-  private startJump() {
-    if (this.isSquashingJump) return;
-    this.isSquashingJump = true;
-
-    this.scale.y = Player.TUNING.squash.scaleY;
-    setTimeout(() => {
-      this.scale.y = 1;
-      this.physics.jump(-Player.TUNING.jumpForce);
-      this.isSquashingJump = false;
-    }, Player.TUNING.squash.durationMs);
   }
 
   /** Load the spritesheet animations to be passed into the constructor */
@@ -287,6 +292,42 @@ class Player extends Container {
       this.move(newDir);
       this.setAnimationState(PlayerAnimationState.Walk);
     }, Player.TUNING.turnAnticipation.delayMs);
+  }
+
+  private startJump() {
+    if (this.isSquashingJump) return;
+    this.isSquashingJump = true;
+
+    const {
+      squashScaleY,
+      squashScaleX,
+      stretchScaleY,
+      stretchScaleX,
+      preJumpSquashDurationMs: squashDurationMs,
+      stretchDurationMs,
+    } = Player.TUNING.jumpVisuals;
+
+    // Squash before takeoff
+    this.scale.set(squashScaleX, squashScaleY);
+    setTimeout(() => {
+      // Stretch on takeoff
+      this.scale.set(stretchScaleX, stretchScaleY);
+      this.physics.jump(-Player.TUNING.jumpForce);
+
+      // Return to normal
+      setTimeout(() => {
+        this.scale.set(1, 1);
+        this.isSquashingJump = false;
+      }, stretchDurationMs);
+    }, squashDurationMs);
+  }
+
+  private applyLandingSquash() {
+    const { squashScaleY, landingSquashDurationMs } = Player.TUNING.jumpVisuals;
+    this.scale.y = squashScaleY;
+    setTimeout(() => {
+      this.scale.y = 1;
+    }, landingSquashDurationMs);
   }
 
   private updateSpriteDirection() {
