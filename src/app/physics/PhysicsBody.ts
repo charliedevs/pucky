@@ -37,7 +37,7 @@ export class PhysicsBody {
     easeAir: 0.3,
 
     /** Max fraction of speedX allowed while airborne */
-    airSpeedFactor: 0.7,
+    airSpeedFactor: 0.9,
   } as const;
 
   /** Current velocity (vx, vy) */
@@ -45,6 +45,8 @@ export class PhysicsBody {
   /** Whether the object is touching the ground */
   public isOnGround = false;
 
+  /** Whether the object was grounded in the prev frame */
+  private wasOnGround = false;
   /** Input direction (-1, 0, 1) */
   private inputX: -1 | 0 | 1 = 0;
   /** Max velocity (horizontal) */
@@ -62,22 +64,35 @@ export class PhysicsBody {
   public update(dt: number) {
     const t = PhysicsBody.TUNING;
 
-    // Determine target horizontal velocity
-    const targetVx = this.inputX * this.maxSpeedX;
+    // 1. Determine top speed (different in air)
+    const maxSpeedX = this.isOnGround
+      ? this.maxSpeedX
+      : t.maxSpeedX * t.airSpeedFactor;
 
+    // 2. Calculate target horizontal velocity
+    const targetVx = this.inputX * maxSpeedX;
+
+    // 3. Choose easing factor
     let easeFactor = this.isOnGround ? t.easeGround : t.easeAir;
     if (this.inputX !== 0 && Math.sign(this.inputX) !== Math.sign(this.vel.x)) {
       // If switching directions, apply harsher easing
       easeFactor *= t.easeTurnMultiplier;
     }
 
-    const appliedTargetVx = this.isOnGround
-      ? targetVx
-      : this.inputX * t.maxSpeedX * t.airSpeedFactor;
+    // 4. Handle "snap to ground" case to prevent slow ramp-up on landing
+    const justLanded = !this.wasOnGround && this.isOnGround;
+    this.wasOnGround = this.isOnGround;
+    const snapToGroundSpeed =
+      justLanded &&
+      Math.abs(this.vel.x) > t.maxSpeedX * t.airSpeedFactor &&
+      Math.abs(this.vel.x - targetVx) < 1;
 
-    this.vel.x = this.dampen(this.vel.x, appliedTargetVx, easeFactor);
+    // 5. Apply velocity
+    this.vel.x = snapToGroundSpeed
+      ? this.inputX * this.maxSpeedX
+      : this.dampen(this.vel.x, targetVx, easeFactor);
 
-    // Apply gravity (different if rising or falling)
+    // 6. Apply gravity (different if rising or falling)
     const gravityFactor =
       this.vel.y < 0 ? this.g * t.gravityUpMultiplier : this.g;
     this.vel.y += gravityFactor * dt;
