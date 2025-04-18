@@ -81,7 +81,7 @@ export class Player extends Actor {
     },
 
     /** Time where you're allowed to jump again before hitting ground */
-    jumpBufferMs: 13000,
+    jumpBufferMs: 10500,
 
     /** Time you can still jump after walking off ledge */
     coyoteTimeMs: 5000,
@@ -97,13 +97,15 @@ export class Player extends Actor {
   } as const;
 
   private facingDir: Direction = Direction.Right;
-  private isSquashingJump = false;
-  private lastFallSpeed = 0;
-  private playedLandingSquash = false;
   private isSkidding = false;
-  private timeSinceGroundedMs = Infinity;
   private jumpHeld = false;
-  private jumpBufferMs = 0;
+  private jumpState = {
+    isSquashing: false,
+    playedLandingSquash: false,
+    buffer: 0,
+    timeSinceGrounded: Infinity,
+    lastFallSpeed: 0,
+  };
 
   private idleAnimation: AnimatedSprite;
   private walkAnimation: AnimatedSprite;
@@ -160,7 +162,7 @@ export class Player extends Actor {
     this.jumpHeld = keyboard.isHeld('Space');
 
     // Track last fall speed
-    if (this.vel.y > 0) this.lastFallSpeed = this.vel.y;
+    if (this.vel.y > 0) this.jumpState.lastFallSpeed = this.vel.y;
 
     const updates = this.updateMovementPhysics(dt);
     this.moveX(dt);
@@ -172,17 +174,17 @@ export class Player extends Actor {
     // Apply landing squash if landing and not jumping again
     if (
       updates.justLanded &&
-      !this.isSquashingJump &&
-      !this.playedLandingSquash
+      !this.jumpState.isSquashing &&
+      !this.jumpState.playedLandingSquash
     ) {
-      const impact = this.getLandingImpact(this.lastFallSpeed);
+      const impact = this.getLandingImpact();
       if (impact > 0.1) {
-        this.playedLandingSquash = true;
+        this.jumpState.playedLandingSquash = true;
         this.applyLandingSquash(impact);
       }
     }
 
-    if (!this.isOnGround) this.playedLandingSquash = false;
+    if (!this.isOnGround) this.jumpState.playedLandingSquash = false;
 
     // Update sprite animations
     this.updateSpriteDirection();
@@ -203,7 +205,7 @@ export class Player extends Actor {
   }
 
   public jump() {
-    this.jumpBufferMs = Player.TUNING.jumpBufferMs;
+    this.jumpState.buffer = Player.TUNING.jumpBufferMs;
   }
 
   /** Load the spritesheet animations to be passed into the constructor */
@@ -317,21 +319,22 @@ export class Player extends Actor {
 
   private tryStartJump() {
     const canJump =
-      this.isOnGround || this.timeSinceGroundedMs < Player.TUNING.coyoteTimeMs;
+      this.isOnGround ||
+      this.jumpState.timeSinceGrounded < Player.TUNING.coyoteTimeMs;
 
     // Check jump buffer to determine whether to begin a jump
     const bufferedJumpStarted =
-      this.jumpBufferMs > 0 && canJump && !this.isSquashingJump;
+      this.jumpState.buffer > 0 && canJump && !this.jumpState.isSquashing;
     if (bufferedJumpStarted) {
-      this.jumpBufferMs = 0;
+      this.jumpState.buffer = 0;
       this.startJump();
-      this.timeSinceGroundedMs = Player.TUNING.coyoteTimeMs;
+      this.jumpState.timeSinceGrounded = Player.TUNING.coyoteTimeMs;
     }
   }
 
   private startJump() {
-    if (this.isSquashingJump) return;
-    this.isSquashingJump = true;
+    if (this.jumpState.isSquashing) return;
+    this.jumpState.isSquashing = true;
 
     const {
       squashScale,
@@ -369,7 +372,7 @@ export class Player extends Actor {
       // Return to normal scale
       normalize,
       Actions.runFunc(() => {
-        this.isSquashingJump = false;
+        this.jumpState.isSquashing = false;
       })
     );
 
@@ -379,18 +382,19 @@ export class Player extends Actor {
   private updateJumpTimers(dt: number) {
     // Update coyote time counter
     if (this.isOnGround) {
-      this.timeSinceGroundedMs = 0;
+      this.jumpState.timeSinceGrounded = 0;
     } else {
-      this.timeSinceGroundedMs += dt * 1000;
+      this.jumpState.timeSinceGrounded += dt * 1000;
     }
 
-    if (this.jumpBufferMs > 0) {
-      this.jumpBufferMs -= dt * 1000; // Remove from buffer every tick
+    if (this.jumpState.buffer > 0) {
+      this.jumpState.buffer -= dt * 1000; // Remove from buffer every tick
     }
   }
 
   /** Returns number between 0 and 1 to determine force of impact with ground */
-  private getLandingImpact(fallSpeed: number): number {
+  private getLandingImpact(): number {
+    const fallSpeed = this.jumpState.lastFallSpeed;
     const threshold = this.tuning.gravity * 16; // limit for showing any squash
     const maxSafeFall = this.tuning.gravity * 24;
 
