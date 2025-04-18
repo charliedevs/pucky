@@ -1,3 +1,4 @@
+import { Actions } from 'pixi-actions';
 import { CreationEngine } from './engine/engine';
 import { setEngine } from './game/getEngine';
 import { LoadScreen } from './game/screens/LoadScreen';
@@ -28,6 +29,10 @@ setEngine(engine);
 
   // Initialize the user settings
   userSettings.init();
+
+  engine.ticker.add((tick) => {
+    Actions.tick(tick.deltaTime / 60);
+  });
 
   // Show the load screen
   await engine.navigation.showScreen(LoadScreen);

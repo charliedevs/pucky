@@ -1,3 +1,4 @@
+import { Actions, Interpolations } from 'pixi-actions';
 import { AnimatedSprite, Spritesheet, Texture } from 'pixi.js';
 import { type KeyboardInput } from '../input/KeyboardInput';
 import { Actor } from './Actor';
@@ -72,11 +73,11 @@ export class Player extends Actor {
 
     /** Visual squash/stretch for jumping */
     jumpVisuals: {
-      squashScale: { x: 1.15, y: 0.5 },
-      stretchScale: { x: 0.8, y: 1.25 },
-      preJumpSquashDurationMs: 40,
-      stretchDurationMs: 70,
-      landingSquashDurationMs: 70,
+      squashScale: { x: 1.15, y: 0.6 },
+      stretchScale: { x: 0.75, y: 1.25 },
+      preJumpSquashDurationMs: 30,
+      stretchDurationMs: 60,
+      landingSquashDurationMs: 60,
     },
 
     /** Time where you're allowed to jump again before hitting ground */
@@ -321,19 +322,39 @@ export class Player extends Actor {
       stretchDurationMs,
     } = Player.TUNING.jumpVisuals;
 
-    // Squash before takeoff
-    this.scale.set(squashScale.x, squashScale.y);
-    setTimeout(() => {
-      // Stretch on takeoff
-      this.scale.set(stretchScale.x, stretchScale.y);
-      this.applyJump(-Player.TUNING.jumpForce);
+    const squash = Actions.scaleTo(
+      this,
+      squashScale.x,
+      squashScale.y,
+      squashDurationMs / 1000,
+      Interpolations.smooth
+    );
+    const stretch = Actions.scaleTo(
+      this,
+      stretchScale.x,
+      stretchScale.y,
+      stretchDurationMs / 1000,
+      Interpolations.pow2out
+    );
+    const normalize = Actions.scaleTo(this, 1, 1, 0.1, Interpolations.smoother);
 
-      // Return to normal
-      setTimeout(() => {
-        this.scale.set(1, 1);
+    const jumpSequence = Actions.sequence(
+      // Squash before takeoff
+      squash,
+      Actions.runFunc(() => {
+        this.applyJump(-Player.TUNING.jumpForce);
+      }),
+      Actions.delay(0.016),
+      // Stretch after takeoff
+      stretch,
+      // Return to normal scale
+      normalize,
+      Actions.runFunc(() => {
         this.isSquashingJump = false;
-      }, stretchDurationMs);
-    }, squashDurationMs);
+      })
+    );
+
+    Actions.play(jumpSequence);
   }
 
   private updateJumpTimers(dt: number) {
@@ -351,10 +372,17 @@ export class Player extends Actor {
 
   private applyLandingSquash() {
     const { squashScale, landingSquashDurationMs } = Player.TUNING.jumpVisuals;
-    this.scale.set(squashScale.x, squashScale.y);
-    setTimeout(() => {
-      this.scale.set(1, 1);
-    }, landingSquashDurationMs);
+    const squash = Actions.scaleTo(
+      this,
+      squashScale.x,
+      squashScale.y,
+      landingSquashDurationMs / 1000,
+      Interpolations.pow2out
+    );
+    const stretchUp = Actions.scaleTo(this, 0.9, 1.1, 0.04);
+    const normalize = Actions.scaleTo(this, 1, 1, 0.1, Interpolations.smoother);
+    const landingSequence = Actions.sequence(squash, stretchUp, normalize);
+    Actions.play(landingSequence);
   }
 
   private updateSpriteDirection() {
