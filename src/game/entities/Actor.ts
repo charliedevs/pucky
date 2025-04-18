@@ -199,6 +199,13 @@ export abstract class Actor extends Container {
     return { justLanded };
   }
 
+  public resetState() {
+    this.vel.x = 0;
+    this.vel.y = 0;
+    this.inputX = 0;
+    this.isOnGround = false;
+  }
+
   /** Provide a callback to determine collision with other objects
    * @param fn Function takes x, y, width, height, and returns a boolean
    */

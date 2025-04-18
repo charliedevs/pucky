@@ -192,6 +192,18 @@ export class Player extends Actor {
     this.applyAnimationForState();
   }
 
+  public override resetState(): void {
+    super.resetState();
+    this.jumpHeld = false;
+    this.jumpState = {
+      isSquashing: false,
+      playedLandingSquash: false,
+      buffer: 0,
+      timeSinceGrounded: Infinity,
+      lastFallSpeed: 0,
+    };
+  }
+
   public moveLeft() {
     this.move(Direction.Left);
   }
