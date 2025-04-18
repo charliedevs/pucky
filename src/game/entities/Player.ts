@@ -80,7 +80,7 @@ export class Player extends Actor {
     },
 
     /** Time where you're allowed to jump again before hitting ground */
-    jumpBufferMs: 15000,
+    jumpBufferMs: 13000,
 
     /** Time you can still jump after walking off ledge */
     coyoteTimeMs: 5000,
@@ -158,26 +158,8 @@ export class Player extends Actor {
     this.moveX(dt);
     this.moveY(dt);
 
-    // Update coyote time counter
-    if (this.isOnGround) {
-      this.timeSinceGroundedMs = 0;
-    } else {
-      this.timeSinceGroundedMs += dt * 1000;
-    }
-    const canJump =
-      this.isOnGround || this.timeSinceGroundedMs < Player.TUNING.coyoteTimeMs;
-
-    // Check jump buffer to determine whether to begin a jump
-    const bufferedJumpStarted =
-      this.jumpBufferMs > 0 && canJump && !this.isSquashingJump;
-    if (bufferedJumpStarted) {
-      this.jumpBufferMs = 0;
-      this.startJump();
-      this.timeSinceGroundedMs = Player.TUNING.coyoteTimeMs;
-    }
-    if (this.jumpBufferMs > 0) {
-      this.jumpBufferMs -= dt * 1000; // Remove from buffer every tick
-    }
+    this.updateJumpTimers(dt);
+    this.tryStartJump();
 
     // Apply landing squash if landing and not jumping again
     const wasGrounded = this.wasGrounded;
@@ -314,6 +296,20 @@ export class Player extends Actor {
     }, Player.TUNING.turnAnticipation.delayMs);
   }
 
+  private tryStartJump() {
+    const canJump =
+      this.isOnGround || this.timeSinceGroundedMs < Player.TUNING.coyoteTimeMs;
+
+    // Check jump buffer to determine whether to begin a jump
+    const bufferedJumpStarted =
+      this.jumpBufferMs > 0 && canJump && !this.isSquashingJump;
+    if (bufferedJumpStarted) {
+      this.jumpBufferMs = 0;
+      this.startJump();
+      this.timeSinceGroundedMs = Player.TUNING.coyoteTimeMs;
+    }
+  }
+
   private startJump() {
     if (this.isSquashingJump) return;
     this.isSquashingJump = true;
@@ -338,6 +334,19 @@ export class Player extends Actor {
         this.isSquashingJump = false;
       }, stretchDurationMs);
     }, squashDurationMs);
+  }
+
+  private updateJumpTimers(dt: number) {
+    // Update coyote time counter
+    if (this.isOnGround) {
+      this.timeSinceGroundedMs = 0;
+    } else {
+      this.timeSinceGroundedMs += dt * 1000;
+    }
+
+    if (this.jumpBufferMs > 0) {
+      this.jumpBufferMs -= dt * 1000; // Remove from buffer every tick
+    }
   }
 
   private applyLandingSquash() {
