@@ -64,12 +64,7 @@ const TUNING_DEFAULTS = {
   },
 } as const;
 
-export type CollisionCheckFn = (
-  x: number,
-  y: number,
-  width: number,
-  height: number
-) => boolean;
+export type CollisionCheckFn = (x: number, y: number, width: number, height: number) => boolean;
 
 /**
  * A base class for moving entities that are affected by gravity and physics-like movement.
@@ -90,6 +85,9 @@ export type CollisionCheckFn = (
  * }
  */
 export abstract class Actor extends Container {
+  /** How much the actor moves each tick */
+  protected static readonly STEP_RESOLUTION = 1;
+
   /** Current velocity */
   public vel = { x: 0, y: 0 };
   /** Actor is touching ground */
@@ -108,10 +106,7 @@ export abstract class Actor extends Container {
 
   private debugOverlay?: HitboxDebugOverlay;
 
-  constructor(
-    tuning: Partial<ActorTuning> = {},
-    debug = { hitboxLabel: 'actor' }
-  ) {
+  constructor(tuning: Partial<ActorTuning> = {}, debug = { hitboxLabel: 'actor' }) {
     super();
     this.tuning = {
       ...TUNING_DEFAULTS,
@@ -128,11 +123,7 @@ export abstract class Actor extends Container {
 
     // DEBUG
     const { width, height } = this.tuning.solidBox;
-    this.debugOverlay = new HitboxDebugOverlay(
-      width,
-      height,
-      debug.hitboxLabel
-    );
+    this.debugOverlay = new HitboxDebugOverlay(width, height, debug.hitboxLabel);
     this.addChild(this.debugOverlay);
   }
 
@@ -143,9 +134,7 @@ export abstract class Actor extends Container {
     const t = this.tuning;
 
     // 1. Determine top speed (different in air)
-    const maxSpeedX = this.isOnGround
-      ? t.maxSpeedX
-      : t.maxSpeedX * t.airSpeedFactor;
+    const maxSpeedX = this.isOnGround ? t.maxSpeedX : t.maxSpeedX * t.airSpeedFactor;
 
     // 2. Calculate target horizontal velocity
     const targetVx = this.inputX * maxSpeedX;
@@ -174,8 +163,7 @@ export abstract class Actor extends Container {
     let gravityFactor = t.gravity;
     if (this.vel.y < 0) {
       if (!this.isJumpHeld() && t.shortHop.enabled) {
-        gravityFactor *=
-          t.gravityUpMultiplier * t.shortHop.earlyReleaseGravityMultiplier;
+        gravityFactor *= t.gravityUpMultiplier * t.shortHop.earlyReleaseGravityMultiplier;
       } else {
         gravityFactor *= t.gravityUpMultiplier;
       }
@@ -185,12 +173,7 @@ export abstract class Actor extends Container {
     // DEBUG
     if (this.debugOverlay && debugConfig.getShowHitboxes()) {
       const box = this.getSolidBox();
-      this.debugOverlay.updateBox(
-        box.x - this.x,
-        box.y - this.y,
-        box.width,
-        box.height
-      );
+      this.debugOverlay.updateBox(box.x - this.x, box.y - this.y, box.width, box.height);
       this.debugOverlay.setVisible(true);
     } else {
       this.debugOverlay?.setVisible(false);
@@ -240,54 +223,49 @@ export abstract class Actor extends Container {
   /** Move horizontally, accounting for collision */
   protected moveX(dt: number) {
     const moveAmount = this.vel.x * dt;
-    const sign = Math.sign(moveAmount);
-    let remaining = Math.abs(moveAmount);
-
-    while (remaining > 0) {
-      const step = Math.min(1, remaining);
-      const nextX = this.x + step * sign;
-      const bounds = this.getSolidBox(nextX, this.y);
-      if (
-        this.checkCollisionFn(bounds.x, bounds.y, bounds.width, bounds.height)
-      ) {
-        this.vel.x = 0;
-        break;
-      }
-      this.x = nextX;
-      remaining -= step;
-    }
+    this._move('x', moveAmount);
   }
 
   /** Move vertically, accounting for collision */
   protected moveY(dt: number) {
     const moveAmount = this.vel.y * dt;
     const sign = Math.sign(moveAmount);
-    let remaining = Math.abs(moveAmount);
+    this.isOnGround = false; // reset each frame and then check to set again
 
-    // Reset grounded status each frame before checking
-    this.isOnGround = false;
-
-    while (remaining > 0) {
-      const step = Math.min(1, remaining);
-      const nextY = this.y + step * sign;
-      const bounds = this.getSolidBox(this.x, nextY);
-      if (
-        this.checkCollisionFn(bounds.x, bounds.y, bounds.width, bounds.height)
-      ) {
-        if (sign > 0) this.isOnGround = true;
-        this.vel.y = 0;
-        break;
-      }
-      this.y = nextY;
-      remaining -= step;
+    const hit = this._move('y', moveAmount);
+    if (hit && sign > 0) {
+      this.isOnGround = true;
     }
   }
 
+  /** Move actor along specified axis, accounting for collisions
+   * @returns true if collision
+   */
+  private _move(axis: 'x' | 'y', amount: number): boolean {
+    const stepSize = Actor.STEP_RESOLUTION;
+    const sign = Math.sign(amount);
+    let remaining = Math.abs(amount);
+
+    while (remaining > 0) {
+      const step = Math.min(stepSize, remaining);
+      const next = axis === 'x' ? this.x + step * sign : this.y + step * sign;
+      const bounds = axis === 'x' ? this.getSolidBox(next, this.y) : this.getSolidBox(this.x, next);
+      if (this.checkCollisionFn(bounds.x, bounds.y, bounds.width, bounds.height)) {
+        if (axis === 'x') this.vel.x = 0;
+        if (axis === 'y') this.vel.y = 0;
+        return true;
+      }
+
+      if (axis === 'x') this.x = next;
+      if (axis === 'y') this.y = next;
+
+      remaining -= step;
+    }
+    return false;
+  }
+
   /** Get collision hitbox  */
-  protected getSolidBox(
-    x: number | undefined = undefined,
-    y: number | undefined = undefined
-  ) {
+  protected getSolidBox(x: number | undefined = undefined, y: number | undefined = undefined) {
     const startX = x !== undefined ? x : this.x;
     const startY = y !== undefined ? y : this.y;
     const hitbox = this.tuning.solidBox;

@@ -172,11 +172,7 @@ export class Player extends Actor {
     this.tryStartJump();
 
     // Apply landing squash if landing and not jumping again
-    if (
-      updates.justLanded &&
-      !this.jumpState.isSquashing &&
-      !this.jumpState.playedLandingSquash
-    ) {
+    if (updates.justLanded && !this.jumpState.isSquashing && !this.jumpState.playedLandingSquash) {
       const impact = this.getLandingImpact();
       if (impact > 0.1) {
         this.jumpState.playedLandingSquash = true;
@@ -222,10 +218,7 @@ export class Player extends Actor {
 
   /** Load the spritesheet animations to be passed into the constructor */
   public static async loadSpritesheet() {
-    const sheet = new Spritesheet(
-      Texture.from(heroSheet.meta.image),
-      heroSheet
-    );
+    const sheet = new Spritesheet(Texture.from(heroSheet.meta.image), heroSheet);
     await sheet.parse();
     return sheet;
   }
@@ -331,12 +324,10 @@ export class Player extends Actor {
 
   private tryStartJump() {
     const canJump =
-      this.isOnGround ||
-      this.jumpState.timeSinceGrounded < Player.TUNING.coyoteTimeMs;
+      this.isOnGround || this.jumpState.timeSinceGrounded < Player.TUNING.coyoteTimeMs;
 
     // Check jump buffer to determine whether to begin a jump
-    const bufferedJumpStarted =
-      this.jumpState.buffer > 0 && canJump && !this.jumpState.isSquashing;
+    const bufferedJumpStarted = this.jumpState.buffer > 0 && canJump && !this.jumpState.isSquashing;
     if (bufferedJumpStarted) {
       this.jumpState.buffer = 0;
       this.startJump();
@@ -413,8 +404,7 @@ export class Player extends Actor {
     let impact: number | null = null;
     if (fallSpeed < threshold) impact = 0;
     if (fallSpeed > maxSafeFall) impact = 1;
-    if (impact === null)
-      impact = (fallSpeed - threshold) / (maxSafeFall - threshold);
+    if (impact === null) impact = (fallSpeed - threshold) / (maxSafeFall - threshold);
 
     return impact;
   }
