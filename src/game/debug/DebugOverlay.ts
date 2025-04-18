@@ -22,8 +22,9 @@ export class PlayerDebugOverlay extends Container {
       { header: 'Player' },
       { label: 'facingDir' },
       { label: 'isSquashingJump' },
+      { label: 'lastFallSpeed' },
+      { label: 'playedLandingSquash' },
       { label: 'isSkidding' },
-      { label: 'wasGrounded' },
       { label: 'timeSinceGroundedMs' },
       { label: 'jumpBufferMs' },
       { label: 'jumpHeld' },
@@ -39,15 +40,18 @@ export class PlayerDebugOverlay extends Container {
       const y = padding + i * 16;
 
       if (entry.header) {
-        const header = new Text(entry.header, {
-          ...style,
-          fontWeight: 'bold',
+        const header = new Text({
+          text: entry.header,
+          style: {
+            ...style,
+            fontWeight: 'bold',
+          },
         });
         header.position.set(padding, y);
         this.addChild(header);
       } else if (entry.label) {
-        const label = new Text(entry.label + ':', style);
-        const value = new Text('', style);
+        const label = new Text({ text: entry.label + ':', style });
+        const value = new Text({ text: '', style });
 
         label.position.set(padding, y);
         value.position.set(padding + labelValueGap, y);
@@ -78,8 +82,9 @@ export class PlayerDebugOverlay extends Container {
     const props: any[] = [
       p['facingDir'],
       p['isSquashingJump'],
+      Math.round(p['lastFallSpeed'] * 100) / 100,
+      p['playedLandingSquash'],
       p['isSkidding'],
-      p['wasGrounded'],
       p['timeSinceGroundedMs'].toFixed(0),
       p['jumpBufferMs'].toFixed(0),
       p['jumpHeld'],

@@ -98,9 +98,9 @@ export class Player extends Actor {
 
   private facingDir: Direction = Direction.Right;
   private isSquashingJump = false;
+  private lastFallSpeed = 0;
   private playedLandingSquash = false;
   private isSkidding = false;
-  private wasGrounded = false;
   private timeSinceGroundedMs = Infinity;
   private jumpHeld = false;
   private jumpBufferMs = 0;
@@ -114,25 +114,28 @@ export class Player extends Actor {
   private animState: PlayerAnimationState = PlayerAnimationState.Idle;
 
   constructor(animations: Spritesheet['animations']) {
-    super({
-      solidBox: {
-        offsetX: -16,
-        offsetY: -64,
-        width: 32,
-        height: 56,
+    super(
+      {
+        solidBox: {
+          offsetX: -16,
+          offsetY: -64,
+          width: 32,
+          height: 56,
+        },
+        maxSpeedX: 3,
+        gravity: 0.5,
+        gravityUpMultiplier: 0.6,
+        easeGround: 0.135,
+        easeTurnMultiplier: 0.25,
+        easeAir: 0.3,
+        airSpeedFactor: 0.9,
+        shortHop: {
+          enabled: true,
+          earlyReleaseGravityMultiplier: 2,
+        },
       },
-      maxSpeedX: 3,
-      gravity: 0.5,
-      gravityUpMultiplier: 0.6,
-      easeGround: 0.135,
-      easeTurnMultiplier: 0.25,
-      easeAir: 0.3,
-      airSpeedFactor: 0.9,
-      shortHop: {
-        enabled: true,
-        earlyReleaseGravityMultiplier: 2,
-      },
-    });
+      { hitboxLabel: 'player' }
+    );
 
     this.idleAnimation = new AnimatedSprite(animations.idle);
     this.walkAnimation = new AnimatedSprite(animations.walk);
@@ -156,7 +159,10 @@ export class Player extends Actor {
   public update(dt: number, keyboard: KeyboardInput) {
     this.jumpHeld = keyboard.isHeld('Space');
 
-    this.updateActor(dt);
+    // Track last fall speed
+    if (this.vel.y > 0) this.lastFallSpeed = this.vel.y;
+
+    const updates = this.updateMovementPhysics(dt);
     this.moveX(dt);
     this.moveY(dt);
 
@@ -164,12 +170,16 @@ export class Player extends Actor {
     this.tryStartJump();
 
     // Apply landing squash if landing and not jumping again
-    const wasGrounded = this.wasGrounded;
-    this.wasGrounded = this.isOnGround;
-    const justLanded = !wasGrounded && this.isOnGround;
-    if (justLanded && !this.isSquashingJump && !this.playedLandingSquash) {
-      this.playedLandingSquash = true;
-      this.applyLandingSquash();
+    if (
+      updates.justLanded &&
+      !this.isSquashingJump &&
+      !this.playedLandingSquash
+    ) {
+      const impact = this.getLandingImpact(this.lastFallSpeed);
+      if (impact > 0.1) {
+        this.playedLandingSquash = true;
+        this.applyLandingSquash(impact);
+      }
     }
 
     if (!this.isOnGround) this.playedLandingSquash = false;
@@ -351,7 +361,7 @@ export class Player extends Actor {
       squash,
       Actions.runFunc(() => {
         // Jump!
-        this.applyJump(-this.getJumpForce());
+        this.applyJump(-Player.TUNING.jumpForce);
       }),
       Actions.delay(0.016),
       // Stretch after takeoff
@@ -364,12 +374,6 @@ export class Player extends Actor {
     );
 
     Actions.play(jumpSequence);
-  }
-
-  private getJumpForce(): number {
-    const base = Player.TUNING.jumpForce;
-    const isShortHop = this.tuning.shortHop.enabled && !this.isJumpHeld;
-    return isShortHop ? base * 0.6 : base;
   }
 
   private updateJumpTimers(dt: number) {
@@ -385,13 +389,30 @@ export class Player extends Actor {
     }
   }
 
-  private applyLandingSquash() {
+  /** Returns number between 0 and 1 to determine force of impact with ground */
+  private getLandingImpact(fallSpeed: number): number {
+    const threshold = this.tuning.gravity * 16; // limit for showing any squash
+    const maxSafeFall = this.tuning.gravity * 24;
+
+    let impact: number | null = null;
+    if (fallSpeed < threshold) impact = 0;
+    if (fallSpeed > maxSafeFall) impact = 1;
+    if (impact === null)
+      impact = (fallSpeed - threshold) / (maxSafeFall - threshold);
+
+    return impact;
+  }
+
+  private applyLandingSquash(impact: number = 1) {
     const { squashScale, landingSquashDurationMs } = Player.TUNING.jumpVisuals;
+    const baseSquash = squashScale;
+    const squashX = baseSquash.x + 0.1 * impact;
+    const squashY = baseSquash.y - 0.2 * impact;
     const squash = Actions.scaleTo(
       this,
-      squashScale.x,
-      squashScale.y,
-      landingSquashDurationMs / 1000,
+      squashX,
+      squashY,
+      (landingSquashDurationMs / 1000) * impact,
       Interpolations.pow2out
     );
     const stretchUp = Actions.scaleTo(this, 0.9, 1.1, 0.04);

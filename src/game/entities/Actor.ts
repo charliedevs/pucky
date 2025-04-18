@@ -108,7 +108,10 @@ export abstract class Actor extends Container {
 
   private debugOverlay?: HitboxDebugOverlay;
 
-  constructor(tuning: Partial<ActorTuning> = {}) {
+  constructor(
+    tuning: Partial<ActorTuning> = {},
+    debug = { hitboxLabel: 'actor' }
+  ) {
     super();
     this.tuning = {
       ...TUNING_DEFAULTS,
@@ -125,12 +128,18 @@ export abstract class Actor extends Container {
 
     // DEBUG
     const { width, height } = this.tuning.solidBox;
-    this.debugOverlay = new HitboxDebugOverlay(width, height, 'actor');
+    this.debugOverlay = new HitboxDebugOverlay(
+      width,
+      height,
+      debug.hitboxLabel
+    );
     this.addChild(this.debugOverlay);
   }
 
-  /** Update velocity based on desired input. Called every frame by scene */
-  public updateActor(dt: number) {
+  /** Update velocity based on desired input. Called every frame by scene
+   * @returns `justLanded`: boolean that determines if actor just landed on ground
+   */
+  public updateMovementPhysics(dt: number) {
     const t = this.tuning;
 
     // 1. Determine top speed (different in air)
@@ -186,6 +195,8 @@ export abstract class Actor extends Container {
     } else {
       this.debugOverlay?.setVisible(false);
     }
+
+    return { justLanded };
   }
 
   /** Provide a callback to determine collision with other objects
