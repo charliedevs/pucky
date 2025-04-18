@@ -105,8 +105,6 @@ export abstract class Actor extends Container {
 
   /** Whether the actor was on the ground in the prev frame */
   private wasOnGround = false;
-  /** Track if jump button is held down */
-  private jumpHeld = false;
 
   private debugOverlay?: HitboxDebugOverlay;
 
@@ -166,7 +164,7 @@ export abstract class Actor extends Container {
     // 6. Apply gravity (different if rising or falling)
     let gravityFactor = t.gravity;
     if (this.vel.y < 0) {
-      if (!this.jumpHeld && t.shortHop.enabled) {
+      if (!this.isJumpHeld() && t.shortHop.enabled) {
         gravityFactor *=
           t.gravityUpMultiplier * t.shortHop.earlyReleaseGravityMultiplier;
       } else {
@@ -216,9 +214,9 @@ export abstract class Actor extends Container {
     this.isOnGround = false;
   }
 
-  /** Keep track of whether jump button is held down */
-  public setJumpHeld(held: boolean) {
-    this.jumpHeld = held;
+  /** For player, determine if jump button is held */
+  protected isJumpHeld(): boolean {
+    return false; // default fallback for non-player actors
   }
 
   /** Move horizontally, accounting for collision */

@@ -26,13 +26,13 @@ export class PlayerDebugOverlay extends Container {
       { label: 'wasGrounded' },
       { label: 'timeSinceGroundedMs' },
       { label: 'jumpBufferMs' },
+      { label: 'jumpHeld' },
       { header: 'Actor' },
       { label: 'vel.x' },
       { label: 'vel.y' },
       { label: 'isOnGround' },
       { label: 'inputX' },
       { label: 'wasOnGround' },
-      { label: 'jumpHeld' },
     ];
 
     lines.forEach((entry, i) => {
@@ -82,12 +82,12 @@ export class PlayerDebugOverlay extends Container {
       p['wasGrounded'],
       p['timeSinceGroundedMs'].toFixed(0),
       p['jumpBufferMs'].toFixed(0),
+      p['jumpHeld'],
       a.vel.x.toFixed(2),
       a.vel.y.toFixed(2),
       a.isOnGround,
       a['inputX'],
       a['wasOnGround'],
-      a['jumpHeld'],
     ];
 
     this.values.forEach((text, idx) => {

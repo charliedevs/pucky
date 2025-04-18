@@ -98,9 +98,11 @@ export class Player extends Actor {
 
   private facingDir: Direction = Direction.Right;
   private isSquashingJump = false;
+  private playedLandingSquash = false;
   private isSkidding = false;
   private wasGrounded = false;
   private timeSinceGroundedMs = Infinity;
+  private jumpHeld = false;
   private jumpBufferMs = 0;
 
   private idleAnimation: AnimatedSprite;
@@ -152,8 +154,7 @@ export class Player extends Actor {
   }
 
   public update(dt: number, keyboard: KeyboardInput) {
-    const isJumpHeld = keyboard.isHeld('Space');
-    this.setJumpHeld(isJumpHeld);
+    this.jumpHeld = keyboard.isHeld('Space');
 
     this.updateActor(dt);
     this.moveX(dt);
@@ -166,9 +167,12 @@ export class Player extends Actor {
     const wasGrounded = this.wasGrounded;
     this.wasGrounded = this.isOnGround;
     const justLanded = !wasGrounded && this.isOnGround;
-    if (justLanded && !this.isSquashingJump) {
+    if (justLanded && !this.isSquashingJump && !this.playedLandingSquash) {
+      this.playedLandingSquash = true;
       this.applyLandingSquash();
     }
+
+    if (!this.isOnGround) this.playedLandingSquash = false;
 
     // Update sprite animations
     this.updateSpriteDirection();
@@ -200,6 +204,10 @@ export class Player extends Actor {
     );
     await sheet.parse();
     return sheet;
+  }
+
+  protected override isJumpHeld(): boolean {
+    return this.jumpHeld;
   }
 
   private updateAnimationStateFromPhysics() {
@@ -342,7 +350,8 @@ export class Player extends Actor {
       // Squash before takeoff
       squash,
       Actions.runFunc(() => {
-        this.applyJump(-Player.TUNING.jumpForce);
+        // Jump!
+        this.applyJump(-this.getJumpForce());
       }),
       Actions.delay(0.016),
       // Stretch after takeoff
@@ -355,6 +364,12 @@ export class Player extends Actor {
     );
 
     Actions.play(jumpSequence);
+  }
+
+  private getJumpForce(): number {
+    const base = Player.TUNING.jumpForce;
+    const isShortHop = this.tuning.shortHop.enabled && !this.isJumpHeld;
+    return isShortHop ? base * 0.6 : base;
   }
 
   private updateJumpTimers(dt: number) {
