@@ -1,5 +1,6 @@
 import { Container, TexturePool, type Ticker } from 'pixi.js';
 import { debugConfig } from '../debug/DebugConfig';
+import { PlayerDebugOverlay } from '../debug/DebugOverlay';
 import { Player } from '../entities/Player';
 import { Solid } from '../entities/Solid';
 import { engine } from '../getEngine';
@@ -27,6 +28,8 @@ export class TestScreen extends Container {
   private player!: Player;
   private playerDestroyed = false;
 
+  private debugOverlay: PlayerDebugOverlay | null = null;
+
   constructor() {
     super();
 
@@ -42,6 +45,14 @@ export class TestScreen extends Container {
     const platform = new Solid(100, 350, 300, 40);
     this.solids.push(platform);
     this.testContainer.addChild(platform);
+
+    const platform2 = new Solid(550, 300, 100, 40);
+    this.solids.push(platform2);
+    this.testContainer.addChild(platform2);
+
+    const platform3 = new Solid(400, 500, 100, 40);
+    this.solids.push(platform3);
+    this.testContainer.addChild(platform3);
 
     const deathZone = new Solid(-1000, 800, 8000, 50, true);
     this.solids.push(deathZone);
@@ -71,8 +82,10 @@ export class TestScreen extends Container {
     this.player.update(ticker.deltaTime, this.keyboard);
 
     // DEBUG
+    this.debugOverlay?.updateOverlay();
     if (this.keyboard.isPressedOnce('F1')) {
       debugConfig.toggleHitboxes();
+      debugConfig.toggleDebugOverlay();
     }
   }
 
@@ -104,6 +117,8 @@ export class TestScreen extends Container {
     this.player.setHazardCallback(() => {
       this.destroyAndRespawnPlayer();
     });
+    this.debugOverlay = new PlayerDebugOverlay(this.player);
+    this.testContainer.addChild(this.debugOverlay);
   }
 
   private collidesAt(x: number, y: number, width: number, height: number) {
@@ -128,6 +143,7 @@ export class TestScreen extends Container {
     if (this.playerDestroyed) return;
     this.playerDestroyed = true;
     this.testContainer.removeChild(this.player);
+    if (this.debugOverlay) this.testContainer.removeChild(this.debugOverlay);
 
     // Recreate player after short delay
     setTimeout(async () => {

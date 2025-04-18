@@ -3,7 +3,8 @@
  * Use this to toggle hitboxes, labels, debug overlays, etc.
  */
 class DebugConfig {
-  private showAllHitboxes = false;
+  private showAllHitboxes = true;
+  private showDebugOverlay = true;
   //private showPlayerHitbox = false;
   //private showSolidHitboxes = false;
   private showLabels = true;
@@ -11,6 +12,10 @@ class DebugConfig {
   /** Toggle global hitbox visibility */
   public toggleHitboxes() {
     this.showAllHitboxes = !this.showAllHitboxes;
+  }
+
+  public toggleDebugOverlay() {
+    this.showDebugOverlay = !this.showDebugOverlay;
   }
 
   /** Whether to show labels (only applies if hitboxes are shown) */
@@ -26,6 +31,10 @@ class DebugConfig {
   /** Whether to show hitboxes */
   public getShowHitboxes() {
     return this.showAllHitboxes;
+  }
+
+  public getShowDebugOverlay() {
+    return this.showDebugOverlay;
   }
 }
 
