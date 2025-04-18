@@ -99,7 +99,7 @@ export class PlayerDebugOverlay extends Container {
 
   private updateBox() {
     const width = 220;
-    const height = this.height + 10;
+    const height = 400;
 
     this.box.clear();
     this.box.setStrokeStyle({ width: 1, color: 0xffffff, alpha: 0.3 });
