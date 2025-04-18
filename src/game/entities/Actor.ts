@@ -212,10 +212,8 @@ export abstract class Actor extends Container {
    * @param forceY vertical force (usually negative to jump)
    */
   public applyJump(forceY: number) {
-    if (this.isOnGround) {
-      this.vel.y = forceY;
-      this.isOnGround = false;
-    }
+    this.vel.y = forceY;
+    this.isOnGround = false;
   }
 
   /** Keep track of whether jump button is held down */

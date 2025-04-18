@@ -80,7 +80,10 @@ export class Player extends Actor {
     },
 
     /** Time where you're allowed to jump again before hitting ground */
-    jumpBuffer: 15000,
+    jumpBufferMs: 15000,
+
+    /** Time you can still jump after walking off ledge */
+    coyoteTimeMs: 5000,
 
     /** Time to pause on closed-feet before going idle */
     idleSnapDelay: 80,
@@ -96,6 +99,7 @@ export class Player extends Actor {
   private isSquashingJump = false;
   private isSkidding = false;
   private wasGrounded = false;
+  private timeSinceGroundedMs = Infinity;
   private jumpBufferMs = 0;
 
   private idleAnimation: AnimatedSprite;
@@ -107,7 +111,25 @@ export class Player extends Actor {
   private animState: PlayerAnimationState = PlayerAnimationState.Idle;
 
   constructor(animations: Spritesheet['animations']) {
-    super();
+    super({
+      solidBox: {
+        offsetX: -16,
+        offsetY: -64,
+        width: 32,
+        height: 56,
+      },
+      maxSpeedX: 3,
+      gravity: 0.5,
+      gravityUpMultiplier: 0.6,
+      easeGround: 0.135,
+      easeTurnMultiplier: 0.25,
+      easeAir: 0.3,
+      airSpeedFactor: 0.9,
+      shortHop: {
+        enabled: true,
+        earlyReleaseGravityMultiplier: 2,
+      },
+    });
 
     this.idleAnimation = new AnimatedSprite(animations.idle);
     this.walkAnimation = new AnimatedSprite(animations.walk);
@@ -136,12 +158,22 @@ export class Player extends Actor {
     this.moveX(dt);
     this.moveY(dt);
 
+    // Update coyote time counter
+    if (this.isOnGround) {
+      this.timeSinceGroundedMs = 0;
+    } else {
+      this.timeSinceGroundedMs += dt * 1000;
+    }
+    const canJump =
+      this.isOnGround || this.timeSinceGroundedMs < Player.TUNING.coyoteTimeMs;
+
     // Check jump buffer to determine whether to begin a jump
     const bufferedJumpStarted =
-      this.jumpBufferMs > 0 && this.isOnGround && !this.isSquashingJump;
+      this.jumpBufferMs > 0 && canJump && !this.isSquashingJump;
     if (bufferedJumpStarted) {
       this.jumpBufferMs = 0;
       this.startJump();
+      this.timeSinceGroundedMs = Player.TUNING.coyoteTimeMs;
     }
     if (this.jumpBufferMs > 0) {
       this.jumpBufferMs -= dt * 1000; // Remove from buffer every tick
@@ -174,7 +206,7 @@ export class Player extends Actor {
   }
 
   public jump() {
-    this.jumpBufferMs = Player.TUNING.jumpBuffer;
+    this.jumpBufferMs = Player.TUNING.jumpBufferMs;
   }
 
   /** Load the spritesheet animations to be passed into the constructor */
