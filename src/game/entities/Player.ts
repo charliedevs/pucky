@@ -119,9 +119,9 @@ export class Player extends Actor {
     super(
       {
         solidBox: {
-          offsetX: -16,
+          offsetX: -24,
           offsetY: -64,
-          width: 32,
+          width: 48,
           height: 56,
         },
         maxSpeedX: 3,
