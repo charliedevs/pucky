@@ -42,9 +42,9 @@ export class TestScreen extends Container {
 
   /** Show the screen */
   public async show() {
-    const platform = new Solid(100, 350, 300, 40);
-    this.solids.push(platform);
-    this.testContainer.addChild(platform);
+    const mainPlatform = new Solid(100, 350, 320, 40);
+    this.solids.push(mainPlatform);
+    this.testContainer.addChild(mainPlatform);
 
     const platform2 = new Solid(550, 300, 100, 40);
     this.solids.push(platform2);
@@ -53,6 +53,10 @@ export class TestScreen extends Container {
     const platform3 = new Solid(400, 500, 100, 40);
     this.solids.push(platform3);
     this.testContainer.addChild(platform3);
+
+    const abovePlatform = new Solid(140, 200, 200, 40);
+    this.solids.push(abovePlatform);
+    this.testContainer.addChild(abovePlatform);
 
     const deathZone = new Solid(-1000, 800, 8000, 50, true);
     this.solids.push(deathZone);
@@ -90,15 +94,9 @@ export class TestScreen extends Container {
   }
 
   private handleInput() {
-    if (
-      this.keyboard.isHeld('ArrowLeft') &&
-      !this.keyboard.isHeld('ArrowRight')
-    ) {
+    if (this.keyboard.isHeld('ArrowLeft') && !this.keyboard.isHeld('ArrowRight')) {
       this.player.moveLeft();
-    } else if (
-      this.keyboard.isHeld('ArrowRight') &&
-      !this.keyboard.isHeld('ArrowLeft')
-    ) {
+    } else if (this.keyboard.isHeld('ArrowRight') && !this.keyboard.isHeld('ArrowLeft')) {
       this.player.moveRight();
     } else {
       this.player.stop();

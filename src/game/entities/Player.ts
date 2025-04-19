@@ -155,7 +155,7 @@ export class Player extends Actor {
     this.currentAnimation.play();
     this.addChild(this.currentAnimation);
 
-    this.position.set(200, 200);
+    this.position.set(200, 320);
   }
 
   public update(dt: number, keyboard: KeyboardInput) {

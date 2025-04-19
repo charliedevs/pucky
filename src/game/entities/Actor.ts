@@ -236,9 +236,14 @@ export abstract class Actor extends Container {
     const sign = Math.sign(moveAmount);
     this.isOnGround = false; // reset each frame and then check to set again
 
+    const yBefore = this.y;
+    const vyBefore = this.vel.y;
     const hit = this._move('y', moveAmount);
+
     if (hit && sign > 0) {
       this.isOnGround = true;
+    } else if (hit && sign < 0) {
+      this.tryCornerWiggle(yBefore, vyBefore);
     }
   }
 
@@ -284,5 +289,47 @@ export abstract class Actor extends Container {
   private dampen(current: number, target: number, factor: number): number {
     const delta = target - current;
     return current + delta * factor;
+  }
+
+  /** If player hits corner of platform above, try wiggling around */
+  private tryCornerWiggle(yBefore: number, vyBefore: number) {
+    if (vyBefore >= 0) return;
+
+    const { offsetX, width, offsetY, height } = this.tuning.solidBox;
+    const wiggleDistance = 20;
+    const probeSize = 2;
+
+    const playerTop = yBefore + offsetY;
+    const playerLeft = this.x + offsetX;
+    const playerRight = playerLeft + width;
+
+    const leftBlocked = this.checkCollisionFn(playerLeft, playerTop - 1, probeSize, probeSize);
+    const rightBlocked = this.checkCollisionFn(
+      playerRight - probeSize,
+      playerTop - 1,
+      probeSize,
+      probeSize
+    );
+
+    const canWiggle = (dir: -1 | 1): boolean => {
+      const dx = dir * wiggleDistance;
+      const testX = this.x + dx;
+      const testBoxX = testX + offsetX;
+      const testBoxY = playerTop;
+
+      const bodyClear = !this.checkCollisionFn(testBoxX, testBoxY, width, height);
+      const aboveClear = !this.checkCollisionFn(testBoxX, testBoxY - 2, width, 2);
+      return bodyClear && aboveClear;
+    };
+
+    if (leftBlocked && !rightBlocked && canWiggle(1)) {
+      this.x += wiggleDistance;
+      this.vel.y = Math.min(vyBefore, -1);
+      console.log('wiggle right!');
+    } else if (rightBlocked && !leftBlocked && canWiggle(-1)) {
+      this.x -= wiggleDistance;
+      this.vel.y = Math.min(vyBefore, -1);
+      console.log('wiggle left!');
+    }
   }
 }
