@@ -6,6 +6,7 @@ import { Solid } from '../entities/Solid';
 import { engine } from '../getEngine';
 import { KeyboardInput } from '../input/KeyboardInput';
 import { PausePopup } from '../popups/PausePopup';
+import { delay } from '../utils/delay';
 
 /**
  * TestScreen Class
@@ -144,10 +145,9 @@ export class TestScreen extends Container {
     if (this.debugOverlay) this.testContainer.removeChild(this.debugOverlay);
 
     // Recreate player after short delay
-    setTimeout(async () => {
-      await this.createPlayer();
-      this.playerDestroyed = false;
-    }, 150);
+    await delay(150);
+    await this.createPlayer();
+    this.playerDestroyed = false;
   }
 
   /** Pause the app if the window loses focus */
