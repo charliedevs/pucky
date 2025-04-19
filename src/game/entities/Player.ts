@@ -398,7 +398,7 @@ export class Player extends Actor {
   /** Returns number between 0 and 1 to determine force of impact with ground */
   private getLandingImpact(): number {
     const fallSpeed = this.jumpState.lastFallSpeed;
-    const threshold = this.tuning.gravity * 16; // limit for showing any squash
+    const threshold = this.tuning.gravity * 14; // limit for showing any squash
     const maxSafeFall = this.tuning.gravity * 24;
 
     let impact: number | null = null;

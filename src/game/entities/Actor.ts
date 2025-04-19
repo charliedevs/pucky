@@ -166,6 +166,10 @@ export abstract class Actor extends Container {
         gravityFactor *= t.gravityUpMultiplier * t.shortHop.earlyReleaseGravityMultiplier;
       } else {
         gravityFactor *= t.gravityUpMultiplier;
+        // Halved gravity at the jump peak
+        if (Math.abs(this.vel.y) < 0.8) {
+          gravityFactor *= 0.5;
+        }
       }
     }
     this.vel.y += gravityFactor * dt;
