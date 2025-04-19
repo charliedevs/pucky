@@ -1,340 +1,12 @@
-import {
-  AnimatedSprite,
-  Container,
-  Graphics,
-  Spritesheet,
-  Texture,
-  TexturePool,
-  type Ticker,
-} from 'pixi.js';
+import { Container, TexturePool, type Ticker } from 'pixi.js';
+import { debugConfig } from '../debug/DebugConfig';
+import { PlayerDebugOverlay } from '../debug/DebugOverlay';
+import { Player } from '../entities/Player';
+import { Solid } from '../entities/Solid';
 import { engine } from '../getEngine';
 import { KeyboardInput } from '../input/KeyboardInput';
-import { PhysicsBody } from '../physics/PhysicsBody';
 import { PausePopup } from '../popups/PausePopup';
-
-/** Spritesheet definition for the player character */
-const heroSheet = {
-  frames: {
-    idle: {
-      frame: { x: 4, y: 2, w: 64, h: 64 },
-      sourceSize: { w: 64, h: 64 },
-      spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
-    },
-    walk: {
-      frame: { x: 68, y: 2, w: 64, h: 64 },
-      sourceSize: { w: 64, h: 64 },
-      spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
-    },
-    jump: {
-      frame: { x: 132, y: 2, w: 64, h: 64 },
-      sourceSize: { w: 64, h: 64 },
-      spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
-    },
-    fall: {
-      frame: { x: 196, y: 2, w: 64, h: 64 },
-      sourceSize: { w: 64, h: 64 },
-      spriteSourceSize: { x: 0, y: 0, w: 64, h: 64 },
-    },
-  },
-  meta: {
-    image: 'hero-spritesheet.png',
-    format: 'RGBA8888',
-    size: { w: 260, h: 68 },
-    scale: 1,
-  },
-  animations: {
-    idle: ['idle'],
-    walk: ['walk', 'idle'],
-    jump: ['jump'],
-    fall: ['fall'],
-    skid: ['walk'],
-  },
-};
-
-enum PlayerAnimationState {
-  Idle,
-  Walk,
-  Skid,
-  Jump,
-  Fall,
-}
-
-enum Direction {
-  Left = -1,
-  None = 0,
-  Right = 1,
-}
-
-/**
- * Player Class
- */
-class Player extends Container {
-  private static readonly GROUND_Y = 300; // temporary until platforms/collision
-
-  /** Parameters to adjust game feel. */
-  private static readonly TUNING = {
-    /** How strong the jump is */
-    jumpForce: 10,
-
-    /** Minimum vx to consider 'moving' */
-    moveThreshold: 0.8,
-
-    /** How long to pause animation when walk starts */
-    walkPause: 50,
-
-    /** Speed of walking loop */
-    walkAnimSpeed: 0.08,
-
-    /** Visual squash/stretch for jumping */
-    jumpVisuals: {
-      squashScale: { x: 1.15, y: 0.5 },
-      stretchScale: { x: 0.8, y: 1.25 },
-      preJumpSquashDurationMs: 40,
-      stretchDurationMs: 70,
-      landingSquashDurationMs: 70,
-    },
-
-    /** Time where you're allowed to jump again before hitting ground */
-    jumpBuffer: 15000,
-
-    /** Time to pause on closed-feet before going idle */
-    idleSnapDelay: 80,
-
-    /** Skidding */
-    turnAnticipation: {
-      threshold: 2, // If speed is over this, apply skid delay on turn
-      delayMs: 80, // How long to delay turn animation
-    },
-  } as const;
-
-  private physics = new PhysicsBody();
-  private facingDir: Direction = Direction.Right;
-  private isSquashingJump = false;
-  private isSkidding = false;
-  private wasGrounded = false;
-  private jumpBufferMs = 0;
-
-  private idleAnimation: AnimatedSprite;
-  private walkAnimation: AnimatedSprite;
-  private skidAnimation: AnimatedSprite;
-  private jumpAnimation: AnimatedSprite;
-  private fallAnimation: AnimatedSprite;
-  private currentAnimation: AnimatedSprite;
-  private animState: PlayerAnimationState = PlayerAnimationState.Idle;
-
-  constructor(animations: Spritesheet['animations']) {
-    super();
-
-    this.idleAnimation = new AnimatedSprite(animations.idle);
-    this.walkAnimation = new AnimatedSprite(animations.walk);
-    this.skidAnimation = new AnimatedSprite(animations.skid);
-    this.jumpAnimation = new AnimatedSprite(animations.jump);
-    this.fallAnimation = new AnimatedSprite(animations.fall);
-
-    this.setupAnim(this.idleAnimation);
-    this.setupAnim(this.walkAnimation, 0.08);
-    this.setupAnim(this.skidAnimation);
-    this.setupAnim(this.jumpAnimation);
-    this.setupAnim(this.fallAnimation);
-
-    this.currentAnimation = this.idleAnimation;
-    this.currentAnimation.play();
-    this.addChild(this.currentAnimation);
-
-    this.position.set(200, 400);
-  }
-
-  public update(dt: number, keyboard: KeyboardInput) {
-    const isJumpHeld = keyboard.isHeld('Space');
-    this.physics.setJumpHeld(isJumpHeld);
-
-    this.physics.update(dt);
-    this.position = this.physics.getNextPosition(this.position, dt);
-    this.y = this.physics.checkGround(Player.GROUND_Y, this.y);
-
-    // Check jump buffer to determine whether to begin a jump
-    const bufferedJumpStarted =
-      this.jumpBufferMs > 0 && this.physics.isOnGround && !this.isSquashingJump;
-    if (bufferedJumpStarted) {
-      this.jumpBufferMs = 0;
-      this.startJump();
-    }
-    if (this.jumpBufferMs > 0) {
-      this.jumpBufferMs -= dt * 1000; // Remove from buffer every tick
-    }
-
-    // Apply landing squash if landing and not jumping again
-    const wasGrounded = this.wasGrounded;
-    this.wasGrounded = this.physics.isOnGround;
-    const justLanded = !wasGrounded && this.physics.isOnGround;
-    if (justLanded && !this.isSquashingJump) {
-      this.applyLandingSquash();
-    }
-
-    this.updateSpriteDirection();
-    this.updateAnimationStateFromPhysics();
-    this.applyAnimationForState();
-  }
-
-  public moveLeft() {
-    this.move(Direction.Left);
-  }
-
-  public moveRight() {
-    this.move(Direction.Right);
-  }
-
-  public stop() {
-    this.move(Direction.None);
-  }
-
-  public jump() {
-    this.jumpBufferMs = Player.TUNING.jumpBuffer;
-  }
-
-  /** Load the spritesheet animations to be passed into the constructor */
-  public static async loadSpritesheet() {
-    const sheet = new Spritesheet(
-      Texture.from(heroSheet.meta.image),
-      heroSheet
-    );
-    await sheet.parse();
-    return sheet;
-  }
-
-  private updateAnimationStateFromPhysics() {
-    if (this.isSkidding) {
-      this.setAnimationState(PlayerAnimationState.Skid);
-      return;
-    }
-
-    const { x: vx, y: vy } = this.physics.vel;
-    const isWalking = Math.abs(vx) > Player.TUNING.moveThreshold;
-
-    if (vy < 0) {
-      this.setAnimationState(PlayerAnimationState.Jump);
-    } else if (vy > 0) {
-      this.setAnimationState(PlayerAnimationState.Fall);
-    } else if (isWalking) {
-      this.setAnimationState(PlayerAnimationState.Walk);
-    } else {
-      this.setAnimationState(PlayerAnimationState.Idle);
-    }
-  }
-
-  private setAnimationState(state: PlayerAnimationState) {
-    if (this.animState === state) return;
-    this.animState = state;
-  }
-
-  private applyAnimationForState() {
-    switch (this.animState) {
-      case PlayerAnimationState.Jump:
-        this.playAnimation(this.jumpAnimation);
-        break;
-      case PlayerAnimationState.Fall:
-        this.playAnimation(this.fallAnimation);
-        break;
-      case PlayerAnimationState.Walk:
-        this.playAnimation(this.walkAnimation);
-        break;
-      case PlayerAnimationState.Skid:
-        this.playAnimation(this.skidAnimation);
-        break;
-      case PlayerAnimationState.Idle:
-      default:
-        this.playAnimation(this.idleAnimation);
-        break;
-    }
-  }
-
-  private setupAnim(anim: AnimatedSprite, speed = 0.1) {
-    anim.anchor.set(0.5, 1);
-    anim.loop = true;
-    anim.animationSpeed = speed;
-  }
-
-  private playAnimation(anim: AnimatedSprite) {
-    if (this.currentAnimation === anim) return;
-    if (this.currentAnimation) {
-      this.removeChild(this.currentAnimation);
-      this.currentAnimation.stop();
-    }
-    this.currentAnimation = anim;
-    this.currentAnimation.gotoAndPlay(0);
-    this.addChild(this.currentAnimation);
-    this.updateSpriteDirection();
-  }
-
-  private move(dir: Direction) {
-    const isReversing =
-      this.physics.isOnGround &&
-      dir !== Direction.None &&
-      Math.sign(this.physics.vel.x) !== dir &&
-      Math.abs(this.physics.vel.x) > Player.TUNING.turnAnticipation.threshold;
-    if (isReversing && !this.isSkidding) {
-      this.triggerTurnSkid(dir);
-      return;
-    }
-
-    this.physics.setInputX(dir);
-
-    if (dir !== Direction.None) {
-      this.facingDir = dir;
-    }
-  }
-
-  private triggerTurnSkid(newDir: Direction) {
-    if (this.isSkidding) return;
-    this.isSkidding = true;
-
-    this.setAnimationState(PlayerAnimationState.Skid);
-
-    setTimeout(() => {
-      this.isSkidding = false;
-      this.move(newDir);
-      this.setAnimationState(PlayerAnimationState.Walk);
-    }, Player.TUNING.turnAnticipation.delayMs);
-  }
-
-  private startJump() {
-    if (this.isSquashingJump) return;
-    this.isSquashingJump = true;
-
-    const {
-      squashScale,
-      stretchScale,
-      preJumpSquashDurationMs: squashDurationMs,
-      stretchDurationMs,
-    } = Player.TUNING.jumpVisuals;
-
-    // Squash before takeoff
-    this.scale.set(squashScale.x, squashScale.y);
-    setTimeout(() => {
-      // Stretch on takeoff
-      this.scale.set(stretchScale.x, stretchScale.y);
-      this.physics.jump(-Player.TUNING.jumpForce);
-
-      // Return to normal
-      setTimeout(() => {
-        this.scale.set(1, 1);
-        this.isSquashingJump = false;
-      }, stretchDurationMs);
-    }, squashDurationMs);
-  }
-
-  private applyLandingSquash() {
-    const { squashScale, landingSquashDurationMs } = Player.TUNING.jumpVisuals;
-    this.scale.set(squashScale.x, squashScale.y);
-    setTimeout(() => {
-      this.scale.set(1, 1);
-    }, landingSquashDurationMs);
-  }
-
-  private updateSpriteDirection() {
-    this.currentAnimation.scale.x = this.facingDir === Direction.Left ? -1 : 1;
-  }
-}
+import { delay } from '../utils/delay';
 
 /**
  * TestScreen Class
@@ -352,7 +24,12 @@ export class TestScreen extends Container {
   public testContainer: Container;
   private paused = false;
   private keyboard = new KeyboardInput();
+
+  private solids: Solid[] = [];
   private player!: Player;
+  private playerDestroyed = false;
+
+  private debugOverlay: PlayerDebugOverlay | null = null;
 
   constructor() {
     super();
@@ -366,15 +43,28 @@ export class TestScreen extends Container {
 
   /** Show the screen */
   public async show() {
-    const shape = new Graphics()
-      .rect(200, 200, 200, 180)
-      .fill({ color: '#FFEA00', alpha: 0.8 });
+    const mainPlatform = new Solid(100, 350, 320, 40);
+    this.solids.push(mainPlatform);
+    this.testContainer.addChild(mainPlatform);
 
-    this.testContainer.addChild(shape);
+    const platform2 = new Solid(550, 300, 100, 40);
+    this.solids.push(platform2);
+    this.testContainer.addChild(platform2);
 
-    const sheet = await Player.loadSpritesheet();
-    this.player = new Player(sheet.animations);
-    this.testContainer.addChild(this.player);
+    const platform3 = new Solid(400, 500, 100, 40);
+    this.solids.push(platform3);
+    this.testContainer.addChild(platform3);
+
+    const abovePlatform = new Solid(140, 200, 200, 40);
+    this.solids.push(abovePlatform);
+    this.testContainer.addChild(abovePlatform);
+
+    const deathZone = new Solid(-1000, 800, 8000, 50, true);
+    this.solids.push(deathZone);
+    this.testContainer.addChild(deathZone);
+
+    await this.createPlayer();
+
     engine().ticker.add(this.update, this);
   }
 
@@ -393,20 +83,21 @@ export class TestScreen extends Container {
   public update(ticker: Ticker) {
     if (this.paused) return;
     this.keyboard.update();
-    this.updateMovement();
+    this.handleInput();
     this.player.update(ticker.deltaTime, this.keyboard);
+
+    // DEBUG
+    this.debugOverlay?.updateOverlay();
+    if (this.keyboard.isPressedOnce('F1')) {
+      debugConfig.toggleHitboxes();
+      debugConfig.toggleDebugOverlay();
+    }
   }
 
-  private updateMovement() {
-    if (
-      this.keyboard.isHeld('ArrowLeft') &&
-      !this.keyboard.isHeld('ArrowRight')
-    ) {
+  private handleInput() {
+    if (this.keyboard.isHeld('ArrowLeft') && !this.keyboard.isHeld('ArrowRight')) {
       this.player.moveLeft();
-    } else if (
-      this.keyboard.isHeld('ArrowRight') &&
-      !this.keyboard.isHeld('ArrowLeft')
-    ) {
+    } else if (this.keyboard.isHeld('ArrowRight') && !this.keyboard.isHeld('ArrowLeft')) {
       this.player.moveRight();
     } else {
       this.player.stop();
@@ -415,6 +106,48 @@ export class TestScreen extends Container {
     if (this.keyboard.isPressedOnce('Space')) {
       this.player.jump();
     }
+  }
+
+  private async createPlayer() {
+    const playerSpritesheet = await Player.loadSpritesheet();
+    this.player = new Player(playerSpritesheet.animations);
+    this.player.setCollisionChecker(this.collidesAt.bind(this));
+    this.testContainer.addChild(this.player);
+    this.player.setHazardCallback(() => {
+      this.destroyAndRespawnPlayer();
+    });
+    this.debugOverlay = new PlayerDebugOverlay(this.player);
+    this.testContainer.addChild(this.debugOverlay);
+  }
+
+  private collidesAt(x: number, y: number, width: number, height: number) {
+    for (const solid of this.solids) {
+      const bounds = solid.getBoundsRect();
+      const isColliding =
+        x + width > bounds.x &&
+        x < bounds.x + bounds.width &&
+        y + height > bounds.y &&
+        y < bounds.y + bounds.height;
+
+      if (isColliding && solid.isHazard) {
+        this.player.onHazardTouched?.();
+      }
+
+      if (isColliding) return true;
+    }
+    return false;
+  }
+
+  private async destroyAndRespawnPlayer() {
+    if (this.playerDestroyed) return;
+    this.playerDestroyed = true;
+    this.testContainer.removeChild(this.player);
+    if (this.debugOverlay) this.testContainer.removeChild(this.debugOverlay);
+
+    // Recreate player after short delay
+    await delay(150);
+    await this.createPlayer();
+    this.playerDestroyed = false;
   }
 
   /** Pause the app if the window loses focus */
