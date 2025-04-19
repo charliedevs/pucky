@@ -157,7 +157,7 @@ export abstract class Actor extends Container {
     // 5. Apply velocity
     this.vel.x = snapToGroundSpeed
       ? this.inputX * t.maxSpeedX
-      : this.dampen(this.vel.x, targetVx, easeFactor);
+      : this.approach(this.vel.x, targetVx, easeFactor);
 
     // 6. Apply gravity (different if rising or falling)
     let gravityFactor = t.gravity;
@@ -286,7 +286,8 @@ export abstract class Actor extends Container {
     } as const;
   }
 
-  private dampen(current: number, target: number, factor: number): number {
+  /** Simple smoothing function */
+  private approach(current: number, target: number, factor: number): number {
     const delta = target - current;
     return current + delta * factor;
   }
