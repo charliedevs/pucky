@@ -296,7 +296,7 @@ export abstract class Actor extends Container {
     if (vyBefore >= 0) return;
 
     const { offsetX, width, offsetY, height } = this.tuning.solidBox;
-    const wiggleDistance = 20;
+    const wiggleDistance = 26;
     const probeSize = 2;
 
     const playerTop = yBefore + offsetY;
@@ -323,13 +323,11 @@ export abstract class Actor extends Container {
     };
 
     if (leftBlocked && !rightBlocked && canWiggle(1)) {
-      this.x += wiggleDistance;
+      this.x += wiggleDistance / 2;
       this.vel.y = Math.min(vyBefore, -1);
-      console.log('wiggle right!');
     } else if (rightBlocked && !leftBlocked && canWiggle(-1)) {
-      this.x -= wiggleDistance;
+      this.x -= wiggleDistance / 2;
       this.vel.y = Math.min(vyBefore, -1);
-      console.log('wiggle left!');
     }
   }
 }
